@@ -8,20 +8,9 @@ if(!isset($_SESSION['user_id'])) {
     exit();
 }
 
-// Check if current user is admin (username = admin)
+// All logged-in users can access this page (removed admin-only restriction)
 $current_user = isset($_SESSION['username']) ? $_SESSION['username'] : '';
-
-if($current_user !== 'ali') {
-    // Set error message in session to display on login page
-    $_SESSION['login_error'] = "Access denied. Only admin users can access the user management page. Please login with admin credentials.";
-    
-    // Clear current session
-    session_destroy();
-    
-    // Redirect to login page
-    header("Location: login.php");
-    exit();
-}
+$is_admin = ($current_user === 'ali');
 
 $success_message = '';
 $error_message = '';
@@ -36,14 +25,14 @@ if(isset($_GET['delete_id'])) {
         $delete_stmt->bind_param("i", $delete_id);
         
         if($delete_stmt->execute()) {
-            $success_message = "User deleted successfully!";
+            $success_message = "کارن په بریالیتوب سره ړنګ شو!";
         } else {
-            $error_message = "Error deleting user: " . $conn->error;
+            $error_message = "د کارن ړنګولو کې تېروتنه: " . $conn->error;
         }
         
         $delete_stmt->close();
     } else {
-        $error_message = "You cannot delete your own account!";
+        $error_message = "تاسو خپل حساب نه شئ ړنګولی!";
     }
     
     // Redirect to clear URL parameters
@@ -60,9 +49,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_user'])) {
     
     // Validate username
     if(empty($new_username)) {
-        $error_message = "Username is required";
+        $error_message = "کارن نوم اړین دی";
     } elseif(strlen($new_username) < 3) {
-        $error_message = "Username must be at least 3 characters";
+        $error_message = "کارن نوم باید لږ تر لږه ۳ توري وي";
     } else {
         // Check if username already exists (excluding current user)
         $check_stmt = $conn->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
@@ -71,29 +60,29 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_user'])) {
         $check_result = $check_stmt->get_result();
         
         if($check_result->num_rows > 0) {
-            $error_message = "Username already exists";
+            $error_message = "کارن نوم لا دمخه شتون لري";
         } else {
             // Prepare update query based on whether password is provided
             if(!empty($new_password)) {
                 // Update both username and password
                 if(strlen($new_password) < 6) {
-                    $error_message = "Password must be at least 6 characters";
+                    $error_message = "پټ‌نوم باید لږ تر لږه ۶ توري وي";
                 } elseif($new_password !== $confirm_password) {
-                    $error_message = "Passwords do not match";
+                    $error_message = "پټ‌نومونه سره سمون نه لري";
                 } else {
                     $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
                     $update_stmt = $conn->prepare("UPDATE users SET username = ?, password = ? WHERE id = ?");
                     $update_stmt->bind_param("ssi", $new_username, $hashed_password, $update_id);
                     
                     if($update_stmt->execute()) {
-                        $success_message = "User updated successfully!";
+                        $success_message = "کارن په بریالیتوب سره تازه شو!";
                         
                         // If updating own account, update session username
                         if($update_id == $_SESSION['user_id']) {
                             $_SESSION['username'] = $new_username;
                         }
                     } else {
-                        $error_message = "Error updating user: " . $conn->error;
+                        $error_message = "د کارن تازه کولو کې تېروتنه: " . $conn->error;
                     }
                     $update_stmt->close();
                 }
@@ -103,14 +92,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_user'])) {
                 $update_stmt->bind_param("si", $new_username, $update_id);
                 
                 if($update_stmt->execute()) {
-                    $success_message = "User updated successfully!";
+                    $success_message = "کارن په بریالیتوب سره تازه شو!";
                     
                     // If updating own account, update session username
                     if($update_id == $_SESSION['user_id']) {
                         $_SESSION['username'] = $new_username;
                     }
                 } else {
-                    $error_message = "Error updating user: " . $conn->error;
+                    $error_message = "د کارن تازه کولو کې تېروتنه: " . $conn->error;
                 }
                 $update_stmt->close();
             }
@@ -127,15 +116,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !isset($_POST['update_user'])) {
 
     // validation
     if(empty($username)) {
-        $error_message = "Username is required";
+        $error_message = "کارن نوم اړین دی";
     } elseif(strlen($username) < 3) {
-        $error_message = "Username must be at least 3 characters";
+        $error_message = "کارن نوم باید لږ تر لږه ۳ توري وي";
     } elseif(empty($password)) {
-        $error_message = "Password is required";
+        $error_message = "پټ‌نوم اړین دی";
     } elseif(strlen($password) < 6) {
-        $error_message = "Password must be at least 6 characters";
+        $error_message = "پټ‌نوم باید لږ تر لږه ۶ توري وي";
     } elseif($password !== $confirm_password) {
-        $error_message = "Passwords do not match";
+        $error_message = "پټ‌نومونه سره سمون نه لري";
     } else {
         // check username exists
         $check_stmt = $conn->prepare("SELECT id FROM users WHERE username = ?");
@@ -144,7 +133,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !isset($_POST['update_user'])) {
         $check_result = $check_stmt->get_result();
 
         if($check_result->num_rows > 0) {
-            $error_message = "Username already exists";
+            $error_message = "کارن نوم لا دمخه شتون لري";
         } else {
             // hash password
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
@@ -161,7 +150,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !isset($_POST['update_user'])) {
             $insert_stmt->bind_param("ss", $username, $hashed_password);
 
             if($insert_stmt->execute()) {
-                $success_message = "User created successfully!";
+                $success_message = "کارن په بریالیتوب سره جوړ شو!";
                 $_POST = array();
                 
                 // Refresh users list
@@ -174,7 +163,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !isset($_POST['update_user'])) {
                 }
                 $users_stmt->close();
             } else {
-                $error_message = "Error creating user: " . $conn->error;
+                $error_message = "د کارن جوړولو کې تېروتنه: " . $conn->error;
             }
 
             $insert_stmt->close();
@@ -196,28 +185,29 @@ $users_stmt->close();
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ps" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Management - PharmaCare RX (Admin Only)</title>
+    <title>د کاروونکو مدیریت · قرطاسیه</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary-color: #1a2980;
-            --secondary-color: #26d0ce;
-            --accent-color: #00ffea;
-            --success-color: #4CAF50;
-            --warning-color: #FF9800;
-            --danger-color: #f44336;
-            --info-color: #2196F3;
-            --edit-color: #ffc107;
-            --text-color: #333;
-            --light-bg: #f8f9fa;
+            --primary-color: #1e3c72;
+            --secondary-color: #2b4a7a;
+            --accent-color: #e6b12e;
+            --success-color: #22c55e;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --info-color: #3b82f6;
+            --edit-color: #f59e0b;
+            --text-color: #1f2937;
+            --light-bg: #f8fafc;
             --card-bg: #ffffff;
-            --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-            --shadow-hover: 0 20px 40px rgba(0, 0, 0, 0.15);
-            --border-radius: 12px;
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+            --shadow-hover: 0 20px 40px rgba(0, 0, 0, 0.1);
+            --border-radius: 16px;
             --transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
@@ -225,35 +215,30 @@ $users_stmt->close();
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Noto Naskh Arabic', 'Segoe UI', Tahoma, sans-serif;
         }
 
         body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
+            background: #f1f5f9;
             color: var(--text-color);
             min-height: 100vh;
             font-size: 14px;
+            line-height: 1.6;
         }
 
         /* Admin Header */
         .admin-header {
-            background: linear-gradient(135deg, var(--primary-color), #0c2461);
+            background: var(--primary-color);
             color: white;
-            padding: 10px 20px;
-            text-align: center;
+            padding: 12px 24px;
             border-radius: var(--border-radius);
             margin-bottom: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
+            gap: 12px;
             border: 2px solid var(--accent-color);
-            animation: glow 2s infinite;
-        }
-
-        @keyframes glow {
-            0%, 100% { border-color: var(--accent-color); }
-            50% { border-color: var(--secondary-color); }
+            box-shadow: var(--shadow);
         }
 
         .admin-header i {
@@ -268,8 +253,9 @@ $users_stmt->close();
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            margin-left: 10px;
+            margin-right: 10px;
             border: 1px solid var(--accent-color);
+            font-size: 0.85rem;
         }
 
         /* Page Header */
@@ -280,18 +266,19 @@ $users_stmt->close();
             margin-bottom: 25px;
             flex-wrap: wrap;
             gap: 15px;
-            padding: 15px 20px;
-            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            padding: 18px 24px;
+            background: var(--primary-color);
             border-radius: var(--border-radius);
             color: white;
             box-shadow: var(--shadow);
         }
 
         .page-header h1 {
-            font-size: 1.5rem;
+            font-size: 1.6rem;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            font-weight: 700;
         }
 
         .page-header h1 i {
@@ -300,33 +287,34 @@ $users_stmt->close();
 
         .today {
             background: rgba(255, 255, 255, 0.1);
-            padding: 5px 12px;
+            padding: 6px 16px;
             border-radius: 20px;
             font-size: 0.85rem;
         }
 
         /* Alert Messages */
         .alert {
-            padding: 12px 20px;
-            border-radius: 8px;
+            padding: 14px 20px;
+            border-radius: 12px;
             margin-bottom: 20px;
-            font-weight: 500;
+            font-weight: 600;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
             animation: fadeIn 0.3s ease;
+            font-size: 0.95rem;
         }
 
         .alert-success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+            background-color: #dcfce7;
+            color: #166534;
+            border-right: 4px solid var(--success-color);
         }
 
         .alert-error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+            background-color: #fee2e2;
+            color: #991b1b;
+            border-right: 4px solid var(--danger-color);
         }
 
         /* Stats Cards */
@@ -340,21 +328,21 @@ $users_stmt->close();
         .stat-card {
             background: var(--card-bg);
             border-radius: var(--border-radius);
-            padding: 20px;
+            padding: 24px 20px;
             text-align: center;
             box-shadow: var(--shadow);
             transition: var(--transition);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid #e2e8f0;
         }
 
         .stat-card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-4px);
             box-shadow: var(--shadow-hover);
         }
 
         .stat-card i {
-            font-size: 2rem;
-            color: var(--secondary-color);
+            font-size: 2.2rem;
+            color: var(--accent-color);
             margin-bottom: 10px;
         }
 
@@ -366,15 +354,14 @@ $users_stmt->close();
         }
 
         .stat-label {
-            font-size: 0.9rem;
-            color: #666;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 0.85rem;
+            color: #64748b;
+            font-weight: 600;
         }
 
         .stat-card:nth-child(1) { border-top: 4px solid var(--primary-color); }
-        .stat-card:nth-child(2) { border-top: 4px solid var(--secondary-color); }
-        .stat-card:nth-child(3) { border-top: 4px solid var(--accent-color); }
+        .stat-card:nth-child(2) { border-top: 4px solid var(--accent-color); }
+        .stat-card:nth-child(3) { border-top: 4px solid var(--success-color); }
 
         /* Table Container */
         .table-container {
@@ -385,7 +372,7 @@ $users_stmt->close();
             box-shadow: var(--shadow);
             position: relative;
             overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid #e2e8f0;
             animation: fadeIn 0.4s ease;
         }
 
@@ -396,7 +383,7 @@ $users_stmt->close();
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            background: var(--accent-color);
         }
 
         .table-header {
@@ -414,16 +401,17 @@ $users_stmt->close();
             display: flex;
             align-items: center;
             gap: 10px;
+            font-weight: 700;
         }
 
         .table-header i {
-            color: var(--secondary-color);
+            color: var(--accent-color);
         }
 
         .table-wrapper {
             overflow-x: auto;
             border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.04);
         }
 
         .user-table {
@@ -433,39 +421,38 @@ $users_stmt->close();
         }
 
         .user-table thead {
-            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            background: var(--primary-color);
             color: white;
         }
 
         .user-table th {
             padding: 15px;
-            text-align: left;
+            text-align: right;
             font-weight: 600;
             font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
         }
 
         .user-table th:first-child {
-            border-top-left-radius: 8px;
-        }
-
-        .user-table th:last-child {
             border-top-right-radius: 8px;
         }
 
+        .user-table th:last-child {
+            border-top-left-radius: 8px;
+        }
+
         .user-table tbody tr {
-            border-bottom: 1px solid #e0e0e0;
+            border-bottom: 1px solid #e2e8f0;
             transition: var(--transition);
         }
 
         .user-table tbody tr:hover {
-            background-color: rgba(38, 208, 206, 0.05);
+            background-color: #f8fafc;
         }
 
         .user-table td {
             padding: 15px;
             color: var(--text-color);
+            text-align: right;
         }
 
         .user-table .user-id {
@@ -475,21 +462,30 @@ $users_stmt->close();
         }
 
         .user-table .username {
-            font-weight: 500;
+            font-weight: 600;
             color: var(--primary-color);
         }
 
         .user-table .created-at {
-            color: #666;
+            color: #64748b;
             font-size: 0.9rem;
         }
 
         .user-table .current-user {
-            background-color: rgba(76, 175, 80, 0.1);
+            background-color: #f0fdf4;
         }
 
         .user-table .current-user td {
             color: var(--success-color);
+        }
+
+        .current-badge {
+            background: var(--success-color);
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-right: 5px;
         }
 
         /* Action Buttons */
@@ -500,55 +496,55 @@ $users_stmt->close();
         }
 
         .btn-action {
-            padding: 8px 12px;
+            padding: 8px 14px;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             font-size: 0.85rem;
-            font-weight: 500;
+            font-weight: 600;
             cursor: pointer;
             transition: var(--transition);
             display: inline-flex;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
             text-decoration: none;
             white-space: nowrap;
         }
 
         .btn-edit {
-            background: linear-gradient(45deg, var(--edit-color), #ffb300);
+            background: var(--edit-color);
             color: white;
         }
 
         .btn-edit:hover {
-            background: linear-gradient(45deg, #ffb300, var(--edit-color));
+            background: #d97706;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(255, 193, 7, 0.3);
+            box-shadow: 0 5px 15px rgba(245, 158, 11, 0.3);
         }
 
         .btn-delete {
-            background: linear-gradient(45deg, #dc3545, #c82333);
+            background: var(--danger-color);
             color: white;
         }
 
         .btn-delete:hover {
-            background: linear-gradient(45deg, #c82333, #dc3545);
+            background: #dc2626;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(220, 53, 69, 0.3);
+            box-shadow: 0 5px 15px rgba(239, 68, 68, 0.3);
         }
 
         .btn-view {
-            background: linear-gradient(45deg, var(--info-color), #138496);
+            background: var(--info-color);
             color: white;
         }
 
         .btn-view:hover {
-            background: linear-gradient(45deg, #138496, var(--info-color));
+            background: #2563eb;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(23, 162, 184, 0.3);
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.3);
         }
 
         .btn-action:disabled {
-            opacity: 0.6;
+            opacity: 0.5;
             cursor: not-allowed;
             transform: none !important;
         }
@@ -557,12 +553,12 @@ $users_stmt->close();
         .empty-state {
             text-align: center;
             padding: 40px 20px;
-            color: #666;
+            color: #64748b;
         }
 
         .empty-state i {
             font-size: 3rem;
-            color: #e0e0e0;
+            color: #cbd5e1;
             margin-bottom: 20px;
         }
 
@@ -580,7 +576,7 @@ $users_stmt->close();
             box-shadow: var(--shadow);
             position: relative;
             overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid #e2e8f0;
         }
 
         .form-container::before {
@@ -590,7 +586,7 @@ $users_stmt->close();
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, var(--secondary-color), var(--accent-color));
+            background: var(--accent-color);
         }
 
         .form-header {
@@ -599,23 +595,24 @@ $users_stmt->close();
             gap: 12px;
             margin-bottom: 25px;
             padding-bottom: 15px;
-            border-bottom: 2px solid rgba(0, 0, 0, 0.05);
+            border-bottom: 2px solid #f1f5f9;
         }
 
         .form-header h2 {
             color: var(--primary-color);
             font-size: 1.3rem;
+            font-weight: 700;
         }
 
         .form-header i {
-            color: var(--secondary-color);
+            color: var(--accent-color);
             font-size: 1.3rem;
         }
 
         /* Form Grid */
         .form-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 20px;
             margin-bottom: 25px;
         }
@@ -630,26 +627,24 @@ $users_stmt->close();
             color: var(--primary-color);
             font-weight: 600;
             font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
         }
 
-        .form-input, .form-select {
+        .form-input {
             width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
             background: var(--card-bg);
             font-size: 0.95rem;
             color: var(--text-color);
             transition: var(--transition);
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+            text-align: right;
         }
 
-        .form-input:focus, .form-select:focus {
+        .form-input:focus {
             outline: none;
-            border-color: var(--secondary-color);
-            box-shadow: 0 0 0 3px rgba(38, 208, 206, 0.15);
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(30, 60, 114, 0.1);
         }
 
         .form-input-group {
@@ -658,22 +653,23 @@ $users_stmt->close();
 
         .form-input-group i {
             position: absolute;
-            left: 15px;
+            right: 16px;
             top: 50%;
             transform: translateY(-50%);
-            color: var(--secondary-color);
+            color: #94a3b8;
             font-size: 1rem;
+            pointer-events: none;
         }
 
         .form-input-group .form-input {
-            padding-left: 45px;
+            padding-right: 48px;
         }
 
         /* Buttons */
         .btn {
             padding: 12px 24px;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             font-size: 0.95rem;
             font-weight: 600;
             cursor: pointer;
@@ -683,41 +679,41 @@ $users_stmt->close();
             gap: 8px;
             text-decoration: none;
             white-space: nowrap;
-            min-height: 44px;
+            min-height: 46px;
         }
 
         .btn-primary {
-            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            background: var(--primary-color);
             color: white;
             box-shadow: var(--shadow);
         }
 
         .btn-primary:hover {
+            background: var(--secondary-color);
             transform: translateY(-3px);
-            box-shadow: 0 15px 30px rgba(26, 41, 128, 0.3);
-            background: linear-gradient(45deg, var(--secondary-color), var(--primary-color));
+            box-shadow: 0 15px 30px rgba(30, 60, 114, 0.2);
         }
 
         .btn-secondary {
-            background: rgba(38, 208, 206, 0.1);
-            color: var(--secondary-color);
-            border: 2px solid var(--secondary-color);
+            background: #f1f5f9;
+            color: var(--primary-color);
+            border: 2px solid #e2e8f0;
         }
 
         .btn-secondary:hover {
-            background: rgba(38, 208, 206, 0.2);
+            background: #e2e8f0;
             transform: translateY(-3px);
         }
 
         .btn-edit {
-            background: linear-gradient(45deg, var(--edit-color), #ffb300);
+            background: var(--edit-color);
             color: white;
         }
 
         .btn-edit:hover {
-            background: linear-gradient(45deg, #ffb300, var(--edit-color));
+            background: #d97706;
             transform: translateY(-3px);
-            box-shadow: 0 15px 30px rgba(255, 193, 7, 0.3);
+            box-shadow: 0 15px 30px rgba(245, 158, 11, 0.3);
         }
 
         .btn:disabled {
@@ -738,10 +734,10 @@ $users_stmt->close();
         /* Password toggle */
         .password-toggle {
             position: absolute;
-            right: 15px;
+            left: 16px;
             top: 50%;
             transform: translateY(-50%);
-            color: var(--secondary-color);
+            color: #94a3b8;
             cursor: pointer;
             font-size: 1rem;
             background: none;
@@ -755,28 +751,29 @@ $users_stmt->close();
 
         /* Requirements list */
         .requirements-list {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
+            background: #f8fafc;
+            padding: 16px;
+            border-radius: 10px;
             margin-top: 10px;
-            border-left: 3px solid var(--secondary-color);
+            border-right: 3px solid var(--accent-color);
         }
 
         .requirements-list h4 {
             color: var(--primary-color);
             font-size: 0.9rem;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
+            font-weight: 700;
         }
 
         .requirements-list ul {
             list-style: none;
-            padding-left: 0;
+            padding-right: 0;
         }
 
         .requirements-list li {
             font-size: 0.85rem;
-            color: #666;
-            margin-bottom: 5px;
+            color: #64748b;
+            margin-bottom: 6px;
             display: flex;
             align-items: center;
             gap: 8px;
@@ -784,19 +781,22 @@ $users_stmt->close();
 
         .requirements-list li i {
             font-size: 0.8rem;
+        }
+
+        .requirements-list li i.fa-check {
             color: var(--success-color);
         }
 
-        .requirements-list li.invalid i {
+        .requirements-list li i.fa-times {
             color: var(--danger-color);
         }
 
         /* Password strength indicator */
         .password-strength {
-            margin-top: 5px;
-            height: 4px;
-            border-radius: 2px;
-            background: #e0e0e0;
+            margin-top: 6px;
+            height: 5px;
+            border-radius: 3px;
+            background: #e2e8f0;
             overflow: hidden;
         }
 
@@ -804,7 +804,7 @@ $users_stmt->close();
             height: 100%;
             width: 0%;
             transition: width 0.3s ease;
-            border-radius: 2px;
+            border-radius: 3px;
         }
 
         .strength-weak {
@@ -821,8 +821,8 @@ $users_stmt->close();
 
         .strength-text {
             font-size: 0.8rem;
-            margin-top: 3px;
-            color: #666;
+            margin-top: 4px;
+            color: #64748b;
         }
 
         /* Modal Styles */
@@ -850,8 +850,7 @@ $users_stmt->close();
             overflow-y: auto;
             box-shadow: var(--shadow-hover);
             animation: modalFadeIn 0.3s ease;
-            border: 3px solid transparent;
-            border-image: linear-gradient(45deg, var(--secondary-color), var(--accent-color)) 1;
+            border-top: 4px solid var(--accent-color);
         }
 
         @keyframes modalFadeIn {
@@ -867,13 +866,14 @@ $users_stmt->close();
 
         .modal-header i {
             font-size: 3rem;
-            color: var(--secondary-color);
+            color: var(--accent-color);
             margin-bottom: 15px;
         }
 
         .modal-header h2 {
             color: var(--primary-color);
             font-size: 1.5rem;
+            font-weight: 700;
         }
 
         .modal-body {
@@ -896,13 +896,13 @@ $users_stmt->close();
         }
 
         .password-hint {
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: 6px;
+            background: #eff6ff;
+            padding: 10px 14px;
+            border-radius: 8px;
             font-size: 0.85rem;
             color: var(--info-color);
             margin-top: 5px;
-            border-left: 3px solid var(--info-color);
+            border-right: 3px solid var(--info-color);
         }
 
         /* Search and Filter */
@@ -921,27 +921,69 @@ $users_stmt->close();
 
         .search-box i {
             position: absolute;
-            left: 15px;
+            right: 15px;
             top: 50%;
             transform: translateY(-50%);
-            color: var(--secondary-color);
+            color: #94a3b8;
         }
 
         .search-box input {
             width: 100%;
-            padding: 10px 15px 10px 45px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
+            padding: 10px 45px 10px 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
             font-size: 0.95rem;
+            text-align: right;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(30, 60, 114, 0.1);
         }
 
         .filter-select {
             padding: 10px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
             background: white;
             font-size: 0.95rem;
             min-width: 150px;
+            font-family: 'Noto Naskh Arabic', sans-serif;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(30, 60, 114, 0.1);
+        }
+
+        /* User Details */
+        .user-details {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #f8fafc;
+            border-radius: 10px;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+
+        .detail-value {
+            font-weight: 600;
+            color: var(--primary-color);
+            font-size: 0.95rem;
         }
 
         /* Animation */
@@ -978,7 +1020,7 @@ $users_stmt->close();
             }
             
             .page-header {
-                padding: 12px 15px;
+                padding: 14px 16px;
             }
             
             .action-buttons {
@@ -1006,17 +1048,29 @@ $users_stmt->close();
             
             .table-container,
             .form-container {
-                padding: 15px;
+                padding: 16px;
             }
             
-            .form-input, .form-select {
-                padding: 10px 12px;
+            .form-input {
+                padding: 10px 12px 10px 40px;
                 font-size: 0.9rem;
             }
             
             .modal-content {
                 padding: 20px;
                 width: 95%;
+            }
+        }
+
+        /* Main Content spacing for sidebar */
+        .main-content {
+            padding: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 15px;
+                padding-top: 70px;
             }
         }
     </style>
@@ -1028,10 +1082,10 @@ $users_stmt->close();
         <!-- Admin Header -->
         <div class="admin-header">
             <i class="fas fa-shield-alt"></i>
-            <span>Admin Control Panel</span>
+            <span>د مدیریت کنټرول پینل</span>
             <span class="admin-badge-large">
-                <i class="fas fa-crown"></i>
-                Logged in as: <?php echo htmlspecialchars($current_user); ?>
+                <i class="fas fa-user"></i>
+                ننوتل د: <?php echo htmlspecialchars($current_user); ?>
             </span>
         </div>
 
@@ -1039,7 +1093,7 @@ $users_stmt->close();
         <div class="page-header">
             <h1>
                 <i class="fas fa-users-cog"></i>
-                User Management
+                د کاروونکو مدیریت
             </h1>
             <div class="today">
                 <i class="far fa-calendar"></i>
@@ -1067,29 +1121,29 @@ $users_stmt->close();
             <div class="stat-card">
                 <i class="fas fa-users"></i>
                 <div class="stat-number"><?php echo count($users); ?></div>
-                <div class="stat-label">Total Users</div>
+                <div class="stat-label">ټول کاروونکي</div>
             </div>
             <div class="stat-card">
                 <i class="fas fa-user-plus"></i>
                 <div class="stat-number"><?php echo count(array_filter($users, function($user) {
                     return strtotime($user['created_at']) > strtotime('-7 days');
                 })); ?></div>
-                <div class="stat-label">New This Week</div>
+                <div class="stat-label">دې اونۍ نوي</div>
             </div>
             <div class="stat-card">
                 <i class="fas fa-user-check"></i>
                 <div class="stat-number">1</div>
-                <div class="stat-label">Active Now</div>
+                <div class="stat-label">فعال اوس</div>
             </div>
         </div>
 
         <!-- Users Table -->
         <div class="table-container">
             <div class="table-header">
-                <h2><i class="fas fa-list"></i> All Users</h2>
+                <h2><i class="fas fa-list"></i> ټول کاروونکي</h2>
                 <div class="table-actions">
                     <button class="btn btn-secondary" onclick="refreshTable()">
-                        <i class="fas fa-sync-alt"></i> Refresh
+                        <i class="fas fa-sync-alt"></i> تازه کړئ
                     </button>
                 </div>
             </div>
@@ -1098,12 +1152,12 @@ $users_stmt->close();
             <div class="table-controls">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="searchInput" placeholder="Search users..." onkeyup="searchUsers()">
+                    <input type="text" id="searchInput" placeholder="کاروونکي پلټئ..." onkeyup="searchUsers()">
                 </div>
                 <select class="filter-select" id="filterSelect" onchange="filterUsers()">
-                    <option value="all">All Users</option>
-                    <option value="new">New This Week</option>
-                    <option value="current">Current User</option>
+                    <option value="all">ټول کاروونکي</option>
+                    <option value="new">دې اونۍ نوي</option>
+                    <option value="current">اوسنی کارن</option>
                 </select>
             </div>
 
@@ -1113,9 +1167,9 @@ $users_stmt->close();
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Username</th>
-                                <th>Created Date</th>
-                                <th>Actions</th>
+                                <th>کارن نوم</th>
+                                <th>جوړولو نېټه</th>
+                                <th>کړنې</th>
                             </tr>
                         </thead>
                         <tbody id="usersTableBody">
@@ -1129,7 +1183,7 @@ $users_stmt->close();
                                         <?php echo htmlspecialchars($user['username']); ?>
                                         <?php if($user['id'] == $_SESSION['user_id']): ?>
                                             <span class="current-badge">
-                                                <i class="fas fa-user-check"></i> (You)
+                                                <i class="fas fa-user-check"></i> تاسو
                                             </span>
                                         <?php endif; ?>
                                     </td>
@@ -1142,19 +1196,19 @@ $users_stmt->close();
                                     <td>
                                         <div class="action-buttons-table">
                                             <button class="btn-action btn-view" onclick="viewUserDetails(<?php echo $user['id']; ?>)">
-                                                <i class="fas fa-eye"></i> View
+                                                <i class="fas fa-eye"></i> کتل
                                             </button>
                                             <button class="btn-action btn-edit" onclick="editUser(<?php echo $user['id']; ?>)">
-                                                <i class="fas fa-edit"></i> Edit
+                                                <i class="fas fa-edit"></i> سمول
                                             </button>
                                             <?php if($user['id'] != $_SESSION['user_id']): ?>
                                                 <button class="btn-action btn-delete" 
                                                         onclick="confirmDelete(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['username']); ?>')">
-                                                    <i class="fas fa-trash"></i> Delete
+                                                    <i class="fas fa-trash"></i> ړنګول
                                                 </button>
                                             <?php else: ?>
                                                 <button class="btn-action btn-delete" disabled>
-                                                    <i class="fas fa-trash"></i> Delete
+                                                    <i class="fas fa-trash"></i> ړنګول
                                                 </button>
                                             <?php endif; ?>
                                         </div>
@@ -1166,8 +1220,8 @@ $users_stmt->close();
                 <?php else: ?>
                     <div class="empty-state">
                         <i class="fas fa-users-slash"></i>
-                        <h3>No Users Found</h3>
-                        <p>Start by creating your first user account below.</p>
+                        <h3>هیڅ کارن ونه موندل شو</h3>
+                        <p>د لومړي کارن حساب جوړولو سره پیل وکړئ.</p>
                     </div>
                 <?php endif; ?>
             </div>
@@ -1177,19 +1231,19 @@ $users_stmt->close();
         <div class="form-container">
             <div class="form-header">
                 <i class="fas fa-user-plus"></i>
-                <h2>Add New User Account</h2>
+                <h2>نوی کارن حساب اضافه کړئ</h2>
             </div>
 
             <form method="POST" id="createUserForm">
                 <div class="form-grid">
                     <!-- Username -->
                     <div class="form-group">
-                        <label class="form-label">Username *</label>
+                        <label class="form-label">کارن نوم *</label>
                         <div class="form-input-group">
                             <i class="fas fa-user"></i>
                             <input type="text" class="form-input" id="username" name="username" 
                                    value="<?php echo htmlspecialchars($_POST['username'] ?? ''); ?>"
-                                   placeholder="Enter username (min. 3 characters)" required
+                                   placeholder="کارن نوم ولیکئ (لږ تر لږه ۳ توري)" required
                                    oninput="checkUsername()">
                         </div>
                         <div id="username-feedback" class="strength-text"></div>
@@ -1197,11 +1251,11 @@ $users_stmt->close();
 
                     <!-- Password -->
                     <div class="form-group">
-                        <label class="form-label">Password *</label>
+                        <label class="form-label">پټ‌نوم *</label>
                         <div class="form-input-group">
                             <i class="fas fa-lock"></i>
                             <input type="password" class="form-input" id="password" name="password" 
-                                   placeholder="Enter password (min. 6 characters)" required
+                                   placeholder="پټ‌نوم ولیکئ (لږ تر لږه ۶ توري)" required
                                    oninput="checkPasswordStrength()">
                             <button type="button" class="password-toggle" id="togglePassword">
                                 <i class="fas fa-eye"></i>
@@ -1215,11 +1269,11 @@ $users_stmt->close();
 
                     <!-- Confirm Password -->
                     <div class="form-group">
-                        <label class="form-label">Confirm Password *</label>
+                        <label class="form-label">پټ‌نوم تایید کړئ *</label>
                         <div class="form-input-group">
                             <i class="fas fa-lock"></i>
                             <input type="password" class="form-input" id="confirm_password" name="confirm_password" 
-                                   placeholder="Confirm password" required oninput="checkPasswordMatch()">
+                                   placeholder="پټ‌نوم تایید کړئ" required oninput="checkPasswordMatch()">
                             <button type="button" class="password-toggle" id="toggleConfirmPassword">
                                 <i class="fas fa-eye"></i>
                             </button>
@@ -1230,28 +1284,28 @@ $users_stmt->close();
 
                 <!-- Password Requirements -->
                 <div class="requirements-list">
-                    <h4>Password Requirements:</h4>
+                    <h4>د پټ‌نوم اړتیاوې:</h4>
                     <ul>
-                        <li id="req-length"><i class="fas fa-check"></i> At least 6 characters</li>
-                        <li id="req-uppercase"><i class="fas fa-times"></i> Contains uppercase letter</li>
-                        <li id="req-lowercase"><i class="fas fa-check"></i> Contains lowercase letter</li>
-                        <li id="req-number"><i class="fas fa-times"></i> Contains number</li>
-                        <li id="req-special"><i class="fas fa-times"></i> Contains special character</li>
+                        <li id="req-length"><i class="fas fa-check"></i> لږ تر لږه ۶ توري</li>
+                        <li id="req-uppercase"><i class="fas fa-times"></i> لوی توری لري</li>
+                        <li id="req-lowercase"><i class="fas fa-check"></i> کوچنی توری لري</li>
+                        <li id="req-number"><i class="fas fa-times"></i> شمېره لري</li>
+                        <li id="req-special"><i class="fas fa-times"></i> ځانګړی توری لري</li>
                     </ul>
                 </div>
 
                 <!-- Action Buttons -->
                 <div class="action-buttons">
                     <button type="button" class="btn btn-secondary" onclick="resetForm()">
-                        <i class="fas fa-redo"></i> Reset Form
+                        <i class="fas fa-redo"></i> فورم پاک کړئ
                     </button>
                     
                     <button type="button" class="btn btn-secondary" onclick="window.location.href='dashboard.php'">
-                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        <i class="fas fa-arrow-right"></i> ډشبورډ ته ستنیدل
                     </button>
                     
                     <button type="submit" class="btn btn-primary" id="submitBtn">
-                        <i class="fas fa-save"></i> Create User Account
+                        <i class="fas fa-save"></i> کارن حساب جوړ کړئ
                     </button>
                 </div>
             </form>
@@ -1263,20 +1317,20 @@ $users_stmt->close();
         <div class="modal-content">
             <div class="modal-header">
                 <i class="fas fa-exclamation-triangle"></i>
-                <h2>Confirm Delete</h2>
+                <h2>د ړنګولو تایید</h2>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to delete user <strong id="deleteUsername"></strong>?</p>
+                <p>ایا تاسو ډاډه یاست چې غواړئ د <strong id="deleteUsername"></strong> کارن ړنګ کړئ؟</p>
                 <p style="color: var(--danger-color); font-size: 0.9rem; margin-top: 10px;">
-                    <i class="fas fa-warning"></i> This action cannot be undone!
+                    <i class="fas fa-warning"></i> دا عمل بیرته نه شي راګرځیدلی!
                 </p>
             </div>
             <div class="modal-buttons">
                 <button class="btn btn-secondary" onclick="closeModal()">
-                    <i class="fas fa-times"></i> Cancel
+                    <i class="fas fa-times"></i> لغوه
                 </button>
                 <button class="btn btn-delete" id="confirmDeleteBtn">
-                    <i class="fas fa-trash"></i> Delete User
+                    <i class="fas fa-trash"></i> کارن ړنګ کړئ
                 </button>
             </div>
         </div>
@@ -1287,7 +1341,7 @@ $users_stmt->close();
         <div class="modal-content">
             <div class="modal-header">
                 <i class="fas fa-user-edit"></i>
-                <h2>Edit User</h2>
+                <h2>کارن سمول</h2>
             </div>
             <div class="modal-body">
                 <form method="POST" id="editUserForm">
@@ -1295,37 +1349,37 @@ $users_stmt->close();
                     <input type="hidden" name="user_id" id="edit_user_id">
                     
                     <div class="form-group">
-                        <label class="form-label">Username *</label>
+                        <label class="form-label">کارن نوم *</label>
                         <div class="form-input-group">
                             <i class="fas fa-user"></i>
                             <input type="text" class="form-input" id="edit_username" name="username" 
-                                   placeholder="Enter username (min. 3 characters)" required
+                                   placeholder="کارن نوم ولیکئ (لږ تر لږه ۳ توري)" required
                                    oninput="checkEditUsername()">
                         </div>
                         <div id="edit-username-feedback" class="strength-text"></div>
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">New Password (leave blank to keep current)</label>
+                        <label class="form-label">نوی پټ‌نوم (د اوسني ساتلو لپاره خالي پریږدئ)</label>
                         <div class="form-input-group">
                             <i class="fas fa-lock"></i>
                             <input type="password" class="form-input" id="edit_password" name="password" 
-                                   placeholder="Enter new password" oninput="checkEditPasswordStrength()">
+                                   placeholder="نوی پټ‌نوم ولیکئ" oninput="checkEditPasswordStrength()">
                             <button type="button" class="password-toggle" id="toggleEditPassword">
                                 <i class="fas fa-eye"></i>
                             </button>
                         </div>
                         <div class="password-hint">
-                            <i class="fas fa-info-circle"></i> Only fill this if you want to change the password
+                            <i class="fas fa-info-circle"></i> یوازې هغه وخت ډک کړئ چې غواړئ پټ‌نوم بدل کړئ
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">Confirm New Password</label>
+                        <label class="form-label">نوی پټ‌نوم تایید کړئ</label>
                         <div class="form-input-group">
                             <i class="fas fa-lock"></i>
                             <input type="password" class="form-input" id="edit_confirm_password" name="confirm_password"
-                                   placeholder="Confirm new password" oninput="checkEditPasswordMatch()">
+                                   placeholder="نوی پټ‌نوم تایید کړئ" oninput="checkEditPasswordMatch()">
                             <button type="button" class="password-toggle" id="toggleEditConfirmPassword">
                                 <i class="fas fa-eye"></i>
                             </button>
@@ -1334,22 +1388,22 @@ $users_stmt->close();
                     </div>
 
                     <div id="edit-password-requirements" class="requirements-list" style="display: none;">
-                        <h4>Password Requirements:</h4>
+                        <h4>د پټ‌نوم اړتیاوې:</h4>
                         <ul>
-                            <li id="edit-req-length"><i class="fas fa-times"></i> At least 6 characters</li>
-                            <li id="edit-req-uppercase"><i class="fas fa-times"></i> Contains uppercase letter</li>
-                            <li id="edit-req-lowercase"><i class="fas fa-times"></i> Contains lowercase letter</li>
-                            <li id="edit-req-number"><i class="fas fa-times"></i> Contains number</li>
-                            <li id="edit-req-special"><i class="fas fa-times"></i> Contains special character</li>
+                            <li id="edit-req-length"><i class="fas fa-times"></i> لږ تر لږه ۶ توري</li>
+                            <li id="edit-req-uppercase"><i class="fas fa-times"></i> لوی توری لري</li>
+                            <li id="edit-req-lowercase"><i class="fas fa-times"></i> کوچنی توری لري</li>
+                            <li id="edit-req-number"><i class="fas fa-times"></i> شمېره لري</li>
+                            <li id="edit-req-special"><i class="fas fa-times"></i> ځانګړی توری لري</li>
                         </ul>
                     </div>
 
                     <div class="modal-buttons">
                         <button type="button" class="btn btn-secondary" onclick="closeEditModal()">
-                            <i class="fas fa-times"></i> Cancel
+                            <i class="fas fa-times"></i> لغوه
                         </button>
                         <button type="submit" class="btn btn-edit" id="editSubmitBtn">
-                            <i class="fas fa-save"></i> Update User
+                            <i class="fas fa-save"></i> کارن تازه کړئ
                         </button>
                     </div>
                 </form>
@@ -1362,7 +1416,7 @@ $users_stmt->close();
         <div class="modal-content">
             <div class="modal-header">
                 <i class="fas fa-user-circle"></i>
-                <h2>User Details</h2>
+                <h2>د کارن توضیحات</h2>
             </div>
             <div class="modal-body">
                 <div id="userDetailsContent">
@@ -1371,7 +1425,7 @@ $users_stmt->close();
             </div>
             <div class="modal-buttons">
                 <button class="btn btn-secondary" onclick="closeViewModal()">
-                    <i class="fas fa-times"></i> Close
+                    <i class="fas fa-times"></i> بندول
                 </button>
             </div>
         </div>
@@ -1469,7 +1523,7 @@ $users_stmt->close();
             }
             
             if(username.length < 3) {
-                feedback.textContent = 'Username must be at least 3 characters';
+                feedback.textContent = 'کارن نوم باید لږ تر لږه ۳ توري وي';
                 feedback.style.color = 'var(--danger-color)';
                 return;
             }
@@ -1477,10 +1531,10 @@ $users_stmt->close();
             const isTaken = allUsers.some(user => user.username.toLowerCase() === username.toLowerCase());
             
             if(isTaken) {
-                feedback.textContent = 'Username already taken';
+                feedback.textContent = 'کارن نوم لا دمخه اخیستل شوی';
                 feedback.style.color = 'var(--danger-color)';
             } else {
-                feedback.textContent = 'Username is available';
+                feedback.textContent = 'کارن نوم شتون لري';
                 feedback.style.color = 'var(--success-color)';
             }
         }
@@ -1498,7 +1552,7 @@ $users_stmt->close();
             }
             
             if(username.length < 3) {
-                feedback.textContent = 'Username must be at least 3 characters';
+                feedback.textContent = 'کارن نوم باید لږ تر لږه ۳ توري وي';
                 feedback.style.color = 'var(--danger-color)';
                 return;
             }
@@ -1509,10 +1563,10 @@ $users_stmt->close();
             );
             
             if(isTaken) {
-                feedback.textContent = 'Username already taken';
+                feedback.textContent = 'کارن نوم لا دمخه اخیستل شوی';
                 feedback.style.color = 'var(--danger-color)';
             } else {
-                feedback.textContent = 'Username is available';
+                feedback.textContent = 'کارن نوم شتون لري';
                 feedback.style.color = 'var(--success-color)';
             }
         }
@@ -1544,15 +1598,15 @@ $users_stmt->close();
             
             if(strength <= 40) {
                 strengthBar.className = 'strength-bar strength-weak';
-                strengthText.textContent = 'Weak password';
+                strengthText.textContent = 'کمزوری پټ‌نوم';
                 strengthText.style.color = 'var(--danger-color)';
             } else if(strength <= 80) {
                 strengthBar.className = 'strength-bar strength-medium';
-                strengthText.textContent = 'Medium password';
+                strengthText.textContent = 'منځنی پټ‌نوم';
                 strengthText.style.color = 'var(--warning-color)';
             } else {
                 strengthBar.className = 'strength-bar strength-strong';
-                strengthText.textContent = 'Strong password';
+                strengthText.textContent = 'قوي پټ‌نوم';
                 strengthText.style.color = 'var(--success-color)';
             }
             
@@ -1614,10 +1668,10 @@ $users_stmt->close();
             }
             
             if(password === confirmPassword) {
-                feedback.textContent = 'Passwords match';
+                feedback.textContent = 'پټ‌نومونه سره سمون لري';
                 feedback.style.color = 'var(--success-color)';
             } else {
-                feedback.textContent = 'Passwords do not match';
+                feedback.textContent = 'پټ‌نومونه سره سمون نه لري';
                 feedback.style.color = 'var(--danger-color)';
             }
         }
@@ -1628,25 +1682,22 @@ $users_stmt->close();
             const confirmPassword = editConfirmPassword.value;
             const feedback = document.getElementById('edit-password-match-feedback');
             
-            // If both fields are empty, don't show any message
             if(password.length === 0 && confirmPassword.length === 0) {
                 feedback.textContent = '';
                 return;
             }
             
-            // If only confirm password is filled but password is empty
             if(password.length === 0 && confirmPassword.length > 0) {
-                feedback.textContent = 'Please enter a new password first';
+                feedback.textContent = 'لومړی نوی پټ‌نوم ولیکئ';
                 feedback.style.color = 'var(--warning-color)';
                 return;
             }
             
-            // Check if passwords match
             if(password === confirmPassword) {
-                feedback.textContent = '✓ Passwords match';
+                feedback.textContent = '✓ پټ‌نومونه سره سمون لري';
                 feedback.style.color = 'var(--success-color)';
             } else {
-                feedback.textContent = '✗ Passwords do not match';
+                feedback.textContent = '✗ پټ‌نومونه سره سمون نه لري';
                 feedback.style.color = 'var(--danger-color)';
             }
         }
@@ -1658,19 +1709,19 @@ $users_stmt->close();
             const confirmPassword = confirmPasswordInput.value;
             
             if(username.length < 3) {
-                alert('Username must be at least 3 characters long');
+                alert('کارن نوم باید لږ تر لږه ۳ توري وي');
                 usernameInput.focus();
                 return false;
             }
             
             if(password.length < 6) {
-                alert('Password must be at least 6 characters long');
+                alert('پټ‌نوم باید لږ تر لږه ۶ توري وي');
                 passwordInput.focus();
                 return false;
             }
             
             if(password !== confirmPassword) {
-                alert('Passwords do not match');
+                alert('پټ‌نومونه سره سمون نه لري');
                 confirmPasswordInput.focus();
                 return false;
             }
@@ -1685,20 +1736,20 @@ $users_stmt->close();
             const confirmPassword = editConfirmPassword.value;
             
             if(username.length < 3) {
-                alert('Username must be at least 3 characters long');
+                alert('کارن نوم باید لږ تر لږه ۳ توري وي');
                 editUsername.focus();
                 return false;
             }
             
             if(password.length > 0 || confirmPassword.length > 0) {
                 if(password.length < 6) {
-                    alert('Password must be at least 6 characters long');
+                    alert('پټ‌نوم باید لږ تر لږه ۶ توري وي');
                     editPassword.focus();
                     return false;
                 }
                 
                 if(password !== confirmPassword) {
-                    alert('Passwords do not match');
+                    alert('پټ‌نومونه سره سمون نه لري');
                     editConfirmPassword.focus();
                     return false;
                 }
@@ -1714,7 +1765,7 @@ $users_stmt->close();
                 return;
             }
             
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating User...';
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> کارن جوړیږي...';
             submitBtn.disabled = true;
         });
 
@@ -1725,13 +1776,13 @@ $users_stmt->close();
                 return;
             }
             
-            editSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating User...';
+            editSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> کارن تازه کیږي...';
             editSubmitBtn.disabled = true;
         });
 
         // Reset create form
         function resetForm() {
-            if(confirm('Are you sure you want to reset the form? All entered data will be lost.')) {
+            if(confirm('ایا تاسو ډاډه یاست چې غواړئ فورم پاک کړئ؟ ټول معلومات به له منځه لاړ شي.')) {
                 form.reset();
                 strengthBar.style.width = '0%';
                 strengthText.textContent = '';
@@ -1794,7 +1845,7 @@ $users_stmt->close();
             
             const createdDate = new Date(user.created);
             const daysAgo = Math.floor((new Date() - createdDate) / (1000 * 60 * 60 * 24));
-            const formattedDate = createdDate.toLocaleDateString('en-US', {
+            const formattedDate = createdDate.toLocaleDateString('ps-AF', {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric',
@@ -1805,40 +1856,40 @@ $users_stmt->close();
             const details = `
                 <div class="user-details">
                     <div class="detail-item">
-                        <div class="detail-label">User ID</div>
+                        <div class="detail-label">د کارن ID</div>
                         <div class="detail-value">#${user.id}</div>
                     </div>
                     <div class="detail-item">
-                        <div class="detail-label">Username</div>
+                        <div class="detail-label">کارن نوم</div>
                         <div class="detail-value">${user.username}</div>
                     </div>
                     <div class="detail-item">
-                        <div class="detail-label">Created Date</div>
+                        <div class="detail-label">جوړولو نېټه</div>
                         <div class="detail-value">${formattedDate}</div>
                     </div>
                     <div class="detail-item">
-                        <div class="detail-label">Account Age</div>
-                        <div class="detail-value">${daysAgo} days</div>
+                        <div class="detail-label">د حساب عمر</div>
+                        <div class="detail-value">${daysAgo} ورځې</div>
                     </div>
                     <div class="detail-item">
-                        <div class="detail-label">Status</div>
+                        <div class="detail-label">حالت</div>
                         <div class="detail-value" style="color: var(--success-color);">
-                            <i class="fas fa-check-circle"></i> Active
+                            <i class="fas fa-check-circle"></i> فعال
                         </div>
                     </div>
                 </div>
-                <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                    <div class="detail-label">Quick Actions</div>
+                <div style="margin-top: 20px; padding: 15px; background: #f8fafc; border-radius: 10px;">
+                    <div class="detail-label">ژر کړنې</div>
                     <div style="margin-top: 10px; display: flex; gap: 10px;">
                         <button class="btn-action btn-edit" style="flex: 1;" onclick="closeViewModal(); editUser(${user.id})">
-                            <i class="fas fa-edit"></i> Edit User
+                            <i class="fas fa-edit"></i> کارن سمول
                         </button>
                         ${userId != <?php echo $_SESSION['user_id']; ?> ? 
                             `<button class="btn-action btn-delete" style="flex: 1;" onclick="closeViewModal(); confirmDelete(${userId}, '${user.username}')">
-                                <i class="fas fa-trash"></i> Delete User
+                                <i class="fas fa-trash"></i> کارن ړنګول
                             </button>` : 
                             `<button class="btn-action btn-delete" style="flex: 1;" disabled>
-                                <i class="fas fa-trash"></i> Delete User
+                                <i class="fas fa-trash"></i> کارن ړنګول
                             </button>`
                         }
                     </div>
