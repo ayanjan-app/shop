@@ -8,15 +8,21 @@ $is_admin = ($current_user === 'admin');
 
 <!-- Include Font Awesome -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- Pashto Font -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
     :root {
-        --sidebar-primary: #1a2980;
-        --sidebar-secondary: #26d0ce;
-        --sidebar-accent: #00ffea;
+        --sidebar-primary: #1e3c72;
+        --sidebar-secondary: #2b4a7a;
+        --sidebar-accent: #e6b12e;
         --sidebar-text: #ffffff;
-        --sidebar-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        --sidebar-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
         --sidebar-transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    * {
+        font-family: 'Noto Naskh Arabic', 'Segoe UI', Tahoma, sans-serif;
     }
 
     /* Mobile Toggle Button */
@@ -24,9 +30,9 @@ $is_admin = ($current_user === 'admin');
         display: none;
         position: fixed;
         top: 20px;
-        right: 20px;
+        left: 20px;
         z-index: 1002;
-        background: linear-gradient(45deg, var(--sidebar-primary), var(--sidebar-secondary));
+        background: var(--sidebar-primary);
         color: white;
         border: none;
         border-radius: 12px;
@@ -39,7 +45,8 @@ $is_admin = ($current_user === 'admin');
     }
 
     .sidebar-toggle:hover {
-        transform: scale(1.1);
+        transform: scale(1.08);
+        background: var(--sidebar-secondary);
     }
 
     .sidebar-toggle i {
@@ -49,7 +56,7 @@ $is_admin = ($current_user === 'admin');
     /* ===== SIDEBAR CONTAINER ===== */
     .sidebar {
         width: 280px;
-        background: linear-gradient(135deg, var(--sidebar-primary), #0c2461);
+        background: var(--sidebar-primary);
         color: var(--sidebar-text);
         height: 100vh;
         max-height: 100vh;
@@ -59,8 +66,7 @@ $is_admin = ($current_user === 'admin');
         top: 0;
         z-index: 1000;
         box-shadow: var(--sidebar-shadow);
-        border-left: 3px solid transparent;
-        border-image: linear-gradient(45deg, var(--sidebar-secondary), var(--sidebar-accent)) 1;
+        border-left: 3px solid var(--sidebar-accent);
         overflow: hidden;
         transform: translateX(0);
         transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -69,22 +75,12 @@ $is_admin = ($current_user === 'admin');
         box-sizing: border-box;
     }
 
-    .sidebar::before {
-        content: '';
-        position: absolute;
-        top: 0; left: 0; right: 0;
-        height: 100%;
-        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0,0 L100,0 L100,100 Z" fill="rgba(255,255,255,0.03)"/></svg>');
-        pointer-events: none;
-        z-index: 0;
-    }
-
     /* Logo Section */
     .sidebar-logo {
         text-align: center;
         margin-bottom: 20px;
         padding-bottom: 15px;
-        border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+        border-bottom: 2px solid rgba(255, 255, 255, 0.12);
         position: relative;
         flex-shrink: 0;
         z-index: 1;
@@ -97,57 +93,52 @@ $is_admin = ($current_user === 'admin');
         left: 25%;
         width: 50%;
         height: 2px;
-        background: linear-gradient(90deg, transparent, var(--sidebar-secondary), transparent);
+        background: linear-gradient(90deg, transparent, var(--sidebar-accent), transparent);
     }
 
     .logo-icon {
-        font-size: 2rem;
-        color: var(--sidebar-secondary);
+        font-size: 2.2rem;
+        color: var(--sidebar-accent);
         margin-bottom: 8px;
         display: inline-block;
     }
 
     .sidebar-logo h2 {
         color: white;
-        font-size: 1.2rem;
+        font-size: 1.3rem;
         font-weight: 700;
         letter-spacing: 0.5px;
         margin-bottom: 3px;
-        background: linear-gradient(45deg, white, var(--sidebar-accent));
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
     }
 
     .sidebar-logo p {
-        color: var(--sidebar-secondary);
-        font-size: 0.75rem;
-        opacity: 0.8;
+        color: var(--sidebar-accent);
+        font-size: 0.8rem;
+        opacity: 0.9;
     }
 
     /* User Info Section */
     .user-info {
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.08);
         border-radius: 12px;
-        padding: 12px;
+        padding: 14px 12px;
         margin-bottom: 15px;
         text-align: center;
-        backdrop-filter: blur(10px);
         border: 1px solid rgba(255, 255, 255, 0.1);
         flex-shrink: 0;
         z-index: 1;
     }
 
     .user-avatar {
-        width: 50px;
-        height: 50px;
+        width: 52px;
+        height: 52px;
         border-radius: 50%;
-        background: linear-gradient(45deg, var(--sidebar-primary), var(--sidebar-secondary));
+        background: var(--sidebar-secondary);
         margin: 0 auto 8px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.3rem;
+        font-size: 1.4rem;
         color: white;
         border: 2px solid var(--sidebar-accent);
     }
@@ -159,19 +150,19 @@ $is_admin = ($current_user === 'admin');
     }
 
     .user-role {
-        font-size: 0.75rem;
-        opacity: 0.8;
-        color: var(--sidebar-secondary);
+        font-size: 0.78rem;
+        opacity: 0.85;
+        color: var(--sidebar-accent);
     }
 
     .admin-badge {
         display: inline-block;
-        background: linear-gradient(45deg, var(--sidebar-secondary), var(--sidebar-accent));
+        background: var(--sidebar-accent);
         color: var(--sidebar-primary);
         font-size: 0.65rem;
-        padding: 2px 7px;
+        padding: 2px 10px;
         border-radius: 10px;
-        margin-top: 5px;
+        margin-top: 6px;
         font-weight: bold;
         text-transform: uppercase;
     }
@@ -186,7 +177,7 @@ $is_admin = ($current_user === 'admin');
         padding-left: 2px;
         z-index: 1;
         scrollbar-width: auto;
-        scrollbar-color: var(--sidebar-secondary) rgba(255, 255, 255, 0.1);
+        scrollbar-color: var(--sidebar-accent) rgba(255, 255, 255, 0.1);
     }
 
     .sidebar-menu-container::-webkit-scrollbar {
@@ -199,13 +190,12 @@ $is_admin = ($current_user === 'admin');
     }
 
     .sidebar-menu-container::-webkit-scrollbar-thumb {
-        background: linear-gradient(180deg, var(--sidebar-secondary), var(--sidebar-accent));
+        background: var(--sidebar-accent);
         border-radius: 10px;
-        border: 1px solid rgba(0, 0, 0, 0.1);
     }
 
     .sidebar-menu-container::-webkit-scrollbar-thumb:hover {
-        background: var(--sidebar-accent);
+        background: #f5d97b;
     }
 
     /* Menu List */
@@ -223,10 +213,10 @@ $is_admin = ($current_user === 'admin');
     .sidebar-menu li a {
         color: rgba(255, 255, 255, 0.9);
         text-decoration: none;
-        font-size: 0.92rem;
+        font-size: 0.95rem;
         display: flex;
         align-items: center;
-        padding: 11px 14px;
+        padding: 12px 14px;
         border-radius: 10px;
         transition: all 0.25s ease;
         position: relative;
@@ -235,15 +225,15 @@ $is_admin = ($current_user === 'admin');
     }
 
     .sidebar-menu li a i {
-        margin-right: 12px;
-        font-size: 1.05rem;
-        width: 22px;
+        margin-left: 12px;
+        font-size: 1.1rem;
+        width: 24px;
         text-align: center;
         flex-shrink: 0;
     }
 
     .sidebar-menu li a:hover {
-        background: rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.1);
         color: white;
         transform: translateX(-4px);
     }
@@ -253,9 +243,9 @@ $is_admin = ($current_user === 'admin');
     }
 
     .sidebar-menu li.active a {
-        background: linear-gradient(45deg, rgba(38, 208, 206, 0.25), rgba(0, 255, 234, 0.1));
+        background: rgba(230, 177, 46, 0.15);
         color: var(--sidebar-accent);
-        border-left: 4px solid var(--sidebar-accent);
+        border-right: 4px solid var(--sidebar-accent);
     }
 
     .sidebar-menu li.active a i {
@@ -264,12 +254,12 @@ $is_admin = ($current_user === 'admin');
 
     .sidebar-menu li.logout-item a {
         background: rgba(255, 107, 107, 0.1);
-        border-left: 4px solid #ff6b6b;
+        border-right: 4px solid #ff6b6b;
         margin-top: 10px;
     }
 
     .sidebar-menu li.logout-item a:hover {
-        background: rgba(255, 107, 107, 0.25);
+        background: rgba(255, 107, 107, 0.2);
         color: #ff6b6b;
     }
 
@@ -282,7 +272,7 @@ $is_admin = ($current_user === 'admin');
         padding-top: 12px;
         border-top: 1px solid rgba(255, 255, 255, 0.1);
         text-align: center;
-        font-size: 0.72rem;
+        font-size: 0.75rem;
         color: rgba(255, 255, 255, 0.6);
         flex-shrink: 0;
         z-index: 1;
@@ -300,7 +290,7 @@ $is_admin = ($current_user === 'admin');
         width: 8px;
         height: 8px;
         border-radius: 50%;
-        background: var(--sidebar-secondary);
+        background: #22c55e;
         position: relative;
     }
 
@@ -309,7 +299,7 @@ $is_admin = ($current_user === 'admin');
         position: absolute;
         top: -3px; left: -3px; right: -3px; bottom: -3px;
         border-radius: 50%;
-        border: 2px solid var(--sidebar-secondary);
+        border: 2px solid #22c55e;
         animation: pulse 2s infinite;
     }
 
@@ -336,7 +326,7 @@ $is_admin = ($current_user === 'admin');
         .sidebar {
             width: 280px;
             transform: translateX(100%);
-            box-shadow: -10px 0 50px rgba(0, 0, 0, 0.5);
+            box-shadow: -10px 0 50px rgba(0, 0, 0, 0.4);
         }
         .sidebar.active {
             transform: translateX(0);
@@ -348,9 +338,8 @@ $is_admin = ($current_user === 'admin');
             display: none;
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.6);
             z-index: 999;
-            backdrop-filter: blur(5px);
         }
         .sidebar-overlay.active {
             display: block;
@@ -364,7 +353,7 @@ $is_admin = ($current_user === 'admin');
         }
         .sidebar-toggle {
             top: 15px;
-            right: 15px;
+            left: 15px;
             width: 45px;
             height: 45px;
         }
@@ -400,27 +389,27 @@ $is_admin = ($current_user === 'admin');
     <!-- Logo -->
     <div class="sidebar-logo">
         <div class="logo-icon">
-            <i class="fas fa-clinic-medical"></i>
+            <i class="fas fa-pen-fancy"></i>
         </div>
-        <h2>MUJAHID KARWAN</h2>
-        <p>Pharmacy Management</p>
+              <h2>حاجی نادر او نقیب حقمل </h1>
+         <p>بنجاره پلورنحٔی  </p>
     </div>
 
     <!-- User Info -->
     <div class="user-info">
         <div class="user-avatar">
-            <i class="fas fa-user-md"></i>
+            <i class="fas fa-user-tie"></i>
         </div>
         <div class="user-name">
-            <?php echo !empty($current_user) ? htmlspecialchars($current_user) : 'Guest'; ?>
+            <?php echo !empty($current_user) ? htmlspecialchars($current_user) : 'میلمه'; ?>
         </div>
         <div class="user-role">
             <i class="fas fa-shield-alt"></i>
-            <?php echo $is_admin ? 'Administrator' : 'Staff Member'; ?>
+            <?php echo $is_admin ? 'مدیر' : 'کارکوونکی'; ?>
         </div>
         <?php if($is_admin): ?>
             <div class="admin-badge">
-                <i class="fas fa-crown"></i> Admin Access
+                <i class="fas fa-crown"></i> مدیر
             </div>
         <?php endif; ?>
     </div>
@@ -429,31 +418,31 @@ $is_admin = ($current_user === 'admin');
     <div class="sidebar-menu-container">
         <ul class="sidebar-menu">
             <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'dashboard.php' ? 'active' : ''; ?>">
-                <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i> ډشبورډ</a>
             </li>
-            <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'medicines.php' ? 'active' : ''; ?>">
-                <a href="medicines.php"><i class="fas fa-pills"></i> Add medicines</a>
+            <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'products.php' ? 'active' : ''; ?>">
+                <a href="products.php"><i class="fas fa-boxes"></i> توکي اضافه کړئ</a>
             </li>
             <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'save.php' ? 'active' : ''; ?>">
-                <a href="save.php"><i class="fas fa-plus-circle"></i> Sale</a>
+                <a href="save.php"><i class="fas fa-cash-register"></i> پلور</a>
             </li>
             <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'register.php' ? 'active' : ''; ?>">
-                <a href="register.php"><i class="fas fa-user"></i> Users</a>
+                <a href="register.php"><i class="fas fa-users"></i> کاروونکي</a>
             </li>
             <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'expenses.php' ? 'active' : ''; ?>">
-                <a href="expenses.php"><i class="fas fa-wallet"></i> Expenses</a>
+                <a href="expenses.php"><i class="fas fa-wallet"></i> لګښتونه</a>
             </li>
             <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'item.php' ? 'active' : ''; ?>">
-                <a href="item.php"><i class="fas fa-cog"></i> Stock</a>
+                <a href="item.php"><i class="fas fa-warehouse"></i> ګدام</a>
             </li>
-             <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'item.php' ? 'active' : ''; ?>">
-                <a href="companies.php"><i class="fas fa-city"></i> Companies</a>
+            <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'companies.php' ? 'active' : ''; ?>">
+                <a href="companies.php"><i class="fas fa-building"></i> شرکتونه</a>
             </li>
             <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'backup_manager.php' ? 'active' : ''; ?>">
-                <a href="backup_manager.php"><i class="fas fa-database"></i> Backup Manager</a>
+                <a href="backup_manager.php"><i class="fas fa-database"></i> بیک اپ مدیر</a>
             </li>
             <li class="logout-item <?php echo basename($_SERVER['PHP_SELF']) == 'logout.php' ? 'active' : ''; ?>">
-                <a href="logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                <a href="logout.php"><i class="fas fa-sign-out-alt"></i> وتل</a>
             </li>
         </ul>
     </div>
@@ -462,9 +451,9 @@ $is_admin = ($current_user === 'admin');
     <div class="sidebar-footer">
         <div class="system-status">
             <div class="status-indicator"></div>
-            <span>System Online</span>
+            <span>سیسټم فعال</span>
         </div>
-        <p>© <?php echo date('Y'); ?> PharmaCare RX</p>
+        <p>© <?php echo date('Y'); ?> قرطاسیه</p>
         <p>v2.1.0</p>
     </div>
 </div>
