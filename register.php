@@ -224,6 +224,7 @@ $users_stmt->close();
             min-height: 100vh;
             font-size: 14px;
             line-height: 1.6;
+            margin-top: -50px;
         }
 
         /* Admin Header */
@@ -1069,8 +1070,7 @@ $users_stmt->close();
 
         @media (max-width: 768px) {
             .main-content {
-                padding: 15px;
-                padding-top: 70px;
+           
             }
         }
     </style>

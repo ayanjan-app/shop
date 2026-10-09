@@ -17,19 +17,33 @@ if (!file_exists($backupDir)) {
 $success_message = '';
 $error_message = '';
 
-// Take backup
+// Retrieve flash messages from session (PRG pattern)
+if (isset($_SESSION['flash_success'])) {
+    $success_message = $_SESSION['flash_success'];
+    unset($_SESSION['flash_success']);
+}
+if (isset($_SESSION['flash_error'])) {
+    $error_message = $_SESSION['flash_error'];
+    unset($_SESSION['flash_error']);
+}
+
+// Take backup (POST → redirect to prevent duplicate on refresh)
 if (isset($_POST['backup'])) {
     $file = $backupDir . "db_backup_" . date("Y-m-d_H-i-s") . ".sql";
     $mysqldump = "C:\\xampp\\mysql\\bin\\mysqldump.exe";
 
-    $cmd = "\"$mysqldump\" -u root ph > \"$file\" 2>&1";
+    $cmd = "\"$mysqldump\" -u root shop > \"$file\" 2>&1";
     exec($cmd, $output, $return_var);
     
     if($return_var === 0) {
-        $success_message = "Backup created successfully: " . basename($file);
+        $_SESSION['flash_success'] = "بیک اپ په بریالیتوب سره جوړ شو: " . basename($file);
     } else {
-        $error_message = "Backup failed! Error: " . implode("\n", $output);
+        $_SESSION['flash_error'] = "بیک اپ ناکام شو! تېروتنه: " . implode("\n", $output);
     }
+
+    // PRG: redirect to same page to prevent form resubmission on refresh
+    header("Location: " . strtok($_SERVER["REQUEST_URI"], '?'));
+    exit();
 }
 
 // Restore
@@ -39,17 +53,20 @@ if (isset($_GET['restore'])) {
     
     if(file_exists($file)) {
         $mysql = "C:\\xampp\\mysql\\bin\\mysql.exe";
-        $cmd = "\"$mysql\" -u root ph < \"$file\" 2>&1";
+        $cmd = "\"$mysql\" -u root shop < \"$file\" 2>&1";
         exec($cmd, $output, $return_var);
         
         if($return_var === 0) {
-            $success_message = "Database restored successfully from: " . $filename;
+            $_SESSION['flash_success'] = "ډیټابیس په بریالیتوب سره بحال شو د: " . $filename;
         } else {
-            $error_message = "Restore failed! Error: " . implode("\n", $output);
+            $_SESSION['flash_error'] = "بحالول ناکام شول! تېروتنه: " . implode("\n", $output);
         }
     } else {
-        $error_message = "Backup file not found!";
+        $_SESSION['flash_error'] = "د بیک اپ فایل ونه موندل شو!";
     }
+    
+    header("Location: " . strtok($_SERVER["REQUEST_URI"], '?'));
+    exit();
 }
 
 // Delete
@@ -59,15 +76,14 @@ if (isset($_GET['delete'])) {
     
     if(file_exists($file)) {
         if(unlink($file)) {
-            $success_message = "Backup deleted successfully: " . $filename;
+            $_SESSION['flash_success'] = "بیک اپ په بریالیتوب سره ړنګ شو: " . $filename;
         } else {
-            $error_message = "Failed to delete backup file!";
+            $_SESSION['flash_error'] = "د بیک اپ فایل ړنګول ناکام شول!";
         }
     } else {
-        $error_message = "Backup file not found!";
+        $_SESSION['flash_error'] = "د بیک اپ فایل ونه موندل شو!";
     }
     
-    // Redirect to clear URL parameters
     header("Location: " . strtok($_SERVER["REQUEST_URI"], '?'));
     exit();
 }
@@ -88,30 +104,39 @@ foreach ($files as $f) {
 usort($backup_files, function($a, $b) {
     return $b['modified'] - $a['modified'];
 });
+
+// Helper function to format file size
+function formatFileSize($bytes) {
+    if ($bytes === 0) return '0 Bytes';
+    $k = 1024;
+    $sizes = ['بایټ', 'KB', 'MB', 'GB'];
+    $i = floor(log($bytes) / log($k));
+    return round($bytes / pow($k, $i), 2) . ' ' . $sizes[$i];
+}
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ps" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Database Backup - PharmaCare RX</title>
+    <title>د ډیټابیس بیک اپ · قرطاسیه</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary-color: #1a2980;
-            --secondary-color: #26d0ce;
-            --accent-color: #00ffea;
-            --success-color: #4CAF50;
-            --warning-color: #FF9800;
-            --danger-color: #f44336;
-            --info-color: #2196F3;
-            --text-color: #333;
-            --light-bg: #f8f9fa;
+            --primary-color: #1e3c72;
+            --secondary-color: #2b4a7a;
+            --accent-color: #e6b12e;
+            --success-color: #22c55e;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --info-color: #3b82f6;
+            --text-color: #1f2937;
             --card-bg: #ffffff;
-            --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-            --shadow-hover: 0 20px 40px rgba(0, 0, 0, 0.15);
-            --border-radius: 12px;
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+            --shadow-hover: 0 20px 40px rgba(0, 0, 0, 0.1);
+            --border-radius: 16px;
             --transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
@@ -119,19 +144,17 @@ usort($backup_files, function($a, $b) {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Noto Naskh Arabic', 'Segoe UI', Tahoma, sans-serif;
         }
 
         body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
+            background: #f1f5f9;
             color: var(--text-color);
             min-height: 100vh;
             font-size: 14px;
-        }
-
-       
-        @media (max-width: 768px) {
-        
+            line-height: 1.6;
+            margin-top: -50px;
+     
         }
 
         /* Page Header */
@@ -142,18 +165,19 @@ usort($backup_files, function($a, $b) {
             margin-bottom: 25px;
             flex-wrap: wrap;
             gap: 15px;
-            padding: 15px 20px;
-            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            padding: 18px 24px;
+            background: var(--primary-color);
             border-radius: var(--border-radius);
             color: white;
             box-shadow: var(--shadow);
         }
 
         .page-header h1 {
-            font-size: 1.5rem;
+            font-size: 1.6rem;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            font-weight: 700;
         }
 
         .page-header h1 i {
@@ -162,33 +186,34 @@ usort($backup_files, function($a, $b) {
 
         .today {
             background: rgba(255, 255, 255, 0.1);
-            padding: 5px 12px;
+            padding: 6px 16px;
             border-radius: 20px;
             font-size: 0.85rem;
         }
 
         /* Alert Messages */
         .alert {
-            padding: 12px 20px;
-            border-radius: 8px;
+            padding: 14px 20px;
+            border-radius: 12px;
             margin-bottom: 20px;
-            font-weight: 500;
+            font-weight: 600;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
             animation: fadeIn 0.3s ease;
+            font-size: 0.95rem;
         }
 
         .alert-success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+            background-color: #dcfce7;
+            color: #166534;
+            border-right: 4px solid var(--success-color);
         }
 
         .alert-error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+            background-color: #fee2e2;
+            color: #991b1b;
+            border-right: 4px solid var(--danger-color);
         }
 
         /* Stats Cards */
@@ -202,21 +227,21 @@ usort($backup_files, function($a, $b) {
         .stat-card {
             background: var(--card-bg);
             border-radius: var(--border-radius);
-            padding: 20px;
+            padding: 24px 20px;
             text-align: center;
             box-shadow: var(--shadow);
             transition: var(--transition);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid #e2e8f0;
         }
 
         .stat-card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-4px);
             box-shadow: var(--shadow-hover);
         }
 
         .stat-card i {
-            font-size: 2rem;
-            color: var(--secondary-color);
+            font-size: 2.2rem;
+            color: var(--accent-color);
             margin-bottom: 10px;
         }
 
@@ -228,15 +253,14 @@ usort($backup_files, function($a, $b) {
         }
 
         .stat-label {
-            font-size: 0.9rem;
-            color: #666;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 0.85rem;
+            color: #64748b;
+            font-weight: 600;
         }
 
         .stat-card:nth-child(1) { border-top: 4px solid var(--primary-color); }
-        .stat-card:nth-child(2) { border-top: 4px solid var(--secondary-color); }
-        .stat-card:nth-child(3) { border-top: 4px solid var(--accent-color); }
+        .stat-card:nth-child(2) { border-top: 4px solid var(--accent-color); }
+        .stat-card:nth-child(3) { border-top: 4px solid var(--success-color); }
 
         /* Table Container */
         .table-container {
@@ -247,7 +271,7 @@ usort($backup_files, function($a, $b) {
             box-shadow: var(--shadow);
             position: relative;
             overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid #e2e8f0;
             animation: fadeIn 0.4s ease;
         }
 
@@ -258,7 +282,7 @@ usort($backup_files, function($a, $b) {
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            background: var(--accent-color);
         }
 
         .table-header {
@@ -276,16 +300,17 @@ usort($backup_files, function($a, $b) {
             display: flex;
             align-items: center;
             gap: 10px;
+            font-weight: 700;
         }
 
         .table-header i {
-            color: var(--secondary-color);
+            color: var(--accent-color);
         }
 
         .table-wrapper {
             overflow-x: auto;
             border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.04);
         }
 
         .backup-table {
@@ -295,39 +320,38 @@ usort($backup_files, function($a, $b) {
         }
 
         .backup-table thead {
-            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            background: var(--primary-color);
             color: white;
         }
 
         .backup-table th {
             padding: 15px;
-            text-align: left;
+            text-align: right;
             font-weight: 600;
             font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
         }
 
         .backup-table th:first-child {
-            border-top-left-radius: 8px;
-        }
-
-        .backup-table th:last-child {
             border-top-right-radius: 8px;
         }
 
+        .backup-table th:last-child {
+            border-top-left-radius: 8px;
+        }
+
         .backup-table tbody tr {
-            border-bottom: 1px solid #e0e0e0;
+            border-bottom: 1px solid #e2e8f0;
             transition: var(--transition);
         }
 
         .backup-table tbody tr:hover {
-            background-color: rgba(38, 208, 206, 0.05);
+            background-color: #f8fafc;
         }
 
         .backup-table td {
             padding: 15px;
             color: var(--text-color);
+            text-align: right;
         }
 
         .backup-table .backup-name {
@@ -337,13 +361,9 @@ usort($backup_files, function($a, $b) {
             font-size: 0.9rem;
         }
 
-        .backup-table .backup-size {
-            color: #666;
-            font-size: 0.9rem;
-        }
-
+        .backup-table .backup-size,
         .backup-table .backup-date {
-            color: #666;
+            color: #64748b;
             font-size: 0.9rem;
         }
 
@@ -355,51 +375,51 @@ usort($backup_files, function($a, $b) {
         }
 
         .btn-action {
-            padding: 8px 12px;
+            padding: 8px 14px;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             font-size: 0.85rem;
-            font-weight: 500;
+            font-weight: 600;
             cursor: pointer;
             transition: var(--transition);
             display: inline-flex;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
             text-decoration: none;
             white-space: nowrap;
         }
 
         .btn-download {
-            background: linear-gradient(45deg, var(--success-color), #2e7d32);
+            background: var(--success-color);
             color: white;
         }
 
         .btn-download:hover {
-            background: linear-gradient(45deg, #2e7d32, var(--success-color));
+            background: #16a34a;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+            box-shadow: 0 5px 15px rgba(34, 197, 94, 0.3);
         }
 
         .btn-restore {
-            background: linear-gradient(45deg, var(--info-color), #138496);
+            background: var(--info-color);
             color: white;
         }
 
         .btn-restore:hover {
-            background: linear-gradient(45deg, #138496, var(--info-color));
+            background: #2563eb;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(23, 162, 184, 0.3);
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.3);
         }
 
         .btn-delete {
-            background: linear-gradient(45deg, var(--danger-color), #c82333);
+            background: var(--danger-color);
             color: white;
         }
 
         .btn-delete:hover {
-            background: linear-gradient(45deg, #c82333, var(--danger-color));
+            background: #dc2626;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(220, 53, 69, 0.3);
+            box-shadow: 0 5px 15px rgba(239, 68, 68, 0.3);
         }
 
         /* Backup Controls Container */
@@ -411,7 +431,7 @@ usort($backup_files, function($a, $b) {
             box-shadow: var(--shadow);
             position: relative;
             overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid #e2e8f0;
         }
 
         .backup-controls-container::before {
@@ -421,7 +441,7 @@ usort($backup_files, function($a, $b) {
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, var(--secondary-color), var(--accent-color));
+            background: var(--accent-color);
         }
 
         .controls-header {
@@ -430,16 +450,17 @@ usort($backup_files, function($a, $b) {
             gap: 12px;
             margin-bottom: 25px;
             padding-bottom: 15px;
-            border-bottom: 2px solid rgba(0, 0, 0, 0.05);
+            border-bottom: 2px solid #f1f5f9;
         }
 
         .controls-header h2 {
             color: var(--primary-color);
             font-size: 1.3rem;
+            font-weight: 700;
         }
 
         .controls-header i {
-            color: var(--secondary-color);
+            color: var(--accent-color);
             font-size: 1.3rem;
         }
 
@@ -447,7 +468,7 @@ usort($backup_files, function($a, $b) {
         .btn {
             padding: 12px 24px;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             font-size: 0.95rem;
             font-weight: 600;
             cursor: pointer;
@@ -457,29 +478,29 @@ usort($backup_files, function($a, $b) {
             gap: 8px;
             text-decoration: none;
             white-space: nowrap;
-            min-height: 44px;
+            min-height: 46px;
         }
 
         .btn-primary {
-            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            background: var(--primary-color);
             color: white;
             box-shadow: var(--shadow);
         }
 
         .btn-primary:hover {
+            background: var(--secondary-color);
             transform: translateY(-3px);
-            box-shadow: 0 15px 30px rgba(26, 41, 128, 0.3);
-            background: linear-gradient(45deg, var(--secondary-color), var(--primary-color));
+            box-shadow: 0 15px 30px rgba(30, 60, 114, 0.2);
         }
 
         .btn-secondary {
-            background: rgba(38, 208, 206, 0.1);
-            color: var(--secondary-color);
-            border: 2px solid var(--secondary-color);
+            background: #f1f5f9;
+            color: var(--primary-color);
+            border: 2px solid #e2e8f0;
         }
 
         .btn-secondary:hover {
-            background: rgba(38, 208, 206, 0.2);
+            background: #e2e8f0;
             transform: translateY(-3px);
         }
 
@@ -493,11 +514,11 @@ usort($backup_files, function($a, $b) {
 
         /* Backup Info Section */
         .backup-info {
-            background: #f8f9fa;
+            background: #f8fafc;
             padding: 20px;
-            border-radius: 8px;
+            border-radius: 10px;
             margin-top: 25px;
-            border-left: 4px solid var(--info-color);
+            border-right: 4px solid var(--info-color);
         }
 
         .backup-info h3 {
@@ -506,16 +527,17 @@ usort($backup_files, function($a, $b) {
             display: flex;
             align-items: center;
             gap: 10px;
+            font-weight: 700;
         }
 
         .backup-info ul {
             list-style: none;
-            padding-left: 0;
+            padding-right: 0;
         }
 
         .backup-info li {
             font-size: 0.9rem;
-            color: #666;
+            color: #64748b;
             margin-bottom: 8px;
             display: flex;
             align-items: flex-start;
@@ -523,21 +545,30 @@ usort($backup_files, function($a, $b) {
         }
 
         .backup-info li i {
-            color: var(--secondary-color);
+            color: var(--accent-color);
             font-size: 0.8rem;
-            margin-top: 3px;
+            margin-top: 5px;
+        }
+
+        .backup-info code {
+            background: #e2e8f0;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            direction: ltr;
+            display: inline-block;
         }
 
         /* Empty State */
         .empty-state {
             text-align: center;
             padding: 40px 20px;
-            color: #666;
+            color: #64748b;
         }
 
         .empty-state i {
             font-size: 3rem;
-            color: #e0e0e0;
+            color: #cbd5e1;
             margin-bottom: 20px;
         }
 
@@ -558,6 +589,7 @@ usort($backup_files, function($a, $b) {
             z-index: 1000;
             align-items: center;
             justify-content: center;
+            backdrop-filter: blur(5px);
         }
 
         .modal-content {
@@ -568,6 +600,7 @@ usort($backup_files, function($a, $b) {
             width: 90%;
             box-shadow: var(--shadow-hover);
             animation: modalFadeIn 0.3s ease;
+            border-top: 4px solid var(--accent-color);
         }
 
         @keyframes modalFadeIn {
@@ -584,6 +617,11 @@ usort($backup_files, function($a, $b) {
             font-size: 3rem;
             color: var(--info-color);
             margin-bottom: 15px;
+        }
+
+        .modal-header h2 {
+            color: var(--primary-color);
+            font-weight: 700;
         }
 
         .modal-body {
@@ -617,44 +655,46 @@ usort($backup_files, function($a, $b) {
 
         .search-box i {
             position: absolute;
-            left: 15px;
+            right: 15px;
             top: 50%;
             transform: translateY(-50%);
-            color: var(--secondary-color);
+            color: #94a3b8;
         }
 
         .search-box input {
             width: 100%;
-            padding: 10px 15px 10px 45px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
+            padding: 10px 45px 10px 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
             font-size: 0.95rem;
             background: var(--card-bg);
             color: var(--text-color);
             transition: var(--transition);
+            text-align: right;
         }
 
         .search-box input:focus {
             outline: none;
-            border-color: var(--secondary-color);
-            box-shadow: 0 0 0 3px rgba(38, 208, 206, 0.15);
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(30, 60, 114, 0.1);
         }
 
         .filter-select {
             padding: 10px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
             background: var(--card-bg);
             font-size: 0.95rem;
             min-width: 150px;
             color: var(--text-color);
             transition: var(--transition);
+            font-family: 'Noto Naskh Arabic', sans-serif;
         }
 
         .filter-select:focus {
             outline: none;
-            border-color: var(--secondary-color);
-            box-shadow: 0 0 0 3px rgba(38, 208, 206, 0.15);
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(30, 60, 114, 0.1);
         }
 
         /* Animation */
@@ -687,11 +727,11 @@ usort($backup_files, function($a, $b) {
             
             .backup-controls-container,
             .table-container {
-                padding: 15px;
+                padding: 16px;
             }
             
             .page-header {
-                padding: 12px 15px;
+                padding: 14px 16px;
             }
             
             .action-buttons {
@@ -728,7 +768,7 @@ usort($backup_files, function($a, $b) {
             
             .table-container,
             .backup-controls-container {
-                padding: 15px;
+                padding: 16px;
             }
             
             .modal-content {
@@ -759,19 +799,24 @@ usort($backup_files, function($a, $b) {
         }
 
         .status-success {
-            background: rgba(76, 175, 80, 0.1);
+            background: rgba(34, 197, 94, 0.1);
             color: var(--success-color);
         }
 
-        .status-warning {
-            background: rgba(255, 152, 0, 0.1);
-            color: var(--warning-color);
-        }
-
-        /* Size Formatter */
         .size-formatter {
             font-family: 'Courier New', monospace;
             font-weight: 600;
+        }
+
+        /* Main Content spacing for sidebar */
+        .main-content {
+            padding: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+  
+            }
         }
     </style>
 </head>
@@ -783,7 +828,7 @@ usort($backup_files, function($a, $b) {
         <div class="page-header">
             <h1>
                 <i class="fas fa-database"></i>
-                Database Backup Manager
+                د ډیټابیس بیک اپ مدیر
             </h1>
             <div class="today">
                 <i class="far fa-calendar"></i>
@@ -795,14 +840,14 @@ usort($backup_files, function($a, $b) {
         <?php if($success_message): ?>
             <div class="alert alert-success">
                 <i class="fas fa-check-circle"></i>
-                <?php echo $success_message; ?>
+                <?php echo htmlspecialchars($success_message); ?>
             </div>
         <?php endif; ?>
         
         <?php if($error_message): ?>
             <div class="alert alert-error">
                 <i class="fas fa-exclamation-triangle"></i>
-                <?php echo $error_message; ?>
+                <?php echo htmlspecialchars($error_message); ?>
             </div>
         <?php endif; ?>
 
@@ -811,7 +856,7 @@ usort($backup_files, function($a, $b) {
             <div class="stat-card">
                 <i class="fas fa-database"></i>
                 <div class="stat-number"><?php echo count($backup_files); ?></div>
-                <div class="stat-label">Total Backups</div>
+                <div class="stat-label">ټول بیک اپونه</div>
             </div>
             <div class="stat-card">
                 <i class="fas fa-hdd"></i>
@@ -824,7 +869,7 @@ usort($backup_files, function($a, $b) {
                     echo round($totalSize / 1024 / 1024, 2) . ' MB';
                     ?>
                 </div>
-                <div class="stat-label">Total Size</div>
+                <div class="stat-label">ټول اندازه</div>
             </div>
             <div class="stat-card">
                 <i class="fas fa-clock"></i>
@@ -837,7 +882,7 @@ usort($backup_files, function($a, $b) {
                     }
                     ?>
                 </div>
-                <div class="stat-label">Latest Backup</div>
+                <div class="stat-label">وروستی بیک اپ</div>
             </div>
         </div>
 
@@ -845,33 +890,33 @@ usort($backup_files, function($a, $b) {
         <div class="backup-controls-container">
             <div class="controls-header">
                 <i class="fas fa-cogs"></i>
-                <h2>Backup Operations</h2>
+                <h2>د بیک اپ عملیات</h2>
             </div>
 
             <form method="POST" id="backupForm">
                 <div class="action-buttons">
                     <button type="submit" name="backup" class="btn btn-primary" onclick="return confirmBackup()">
-                        <i class="fas fa-save"></i> Create New Backup
+                        <i class="fas fa-save"></i> نوی بیک اپ جوړ کړئ
                     </button>
                     
                     <button type="button" class="btn btn-secondary" onclick="refreshPage()">
-                        <i class="fas fa-sync-alt"></i> Refresh List
+                        <i class="fas fa-sync-alt"></i> لیست تازه کړئ
                     </button>
                     
                     <a href="dashboard.php" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        <i class="fas fa-arrow-right"></i> ډشبورډ ته ستنیدل
                     </a>
                 </div>
             </form>
 
             <!-- Backup Information -->
             <div class="backup-info">
-                <h3><i class="fas fa-info-circle"></i> Backup Information</h3>
+                <h3><i class="fas fa-info-circle"></i> د بیک اپ معلومات</h3>
                 <ul>
-                    <li><i class="fas fa-check"></i> Backups are stored in: <code><?php echo htmlspecialchars($backupDir); ?></code></li>
-                    <li><i class="fas fa-check"></i> Each backup file contains the complete database structure and data</li>
-                    <li><i class="fas fa-check"></i> Restoring will replace all current data with the backup data</li>
-                    <li><i class="fas fa-check"></i> Regular backups are recommended for data safety</li>
+                    <li><i class="fas fa-check"></i> بیک اپونه دلته خوندي کیږي: <code><?php echo htmlspecialchars($backupDir); ?></code></li>
+                    <li><i class="fas fa-check"></i> هر بیک اپ فایل د ډیټابیس بشپړ جوړښت او معلومات لري</li>
+                    <li><i class="fas fa-check"></i> بحالول به ټول اوسني معلومات د بیک اپ معلوماتو سره بدل کړي</li>
+                    <li><i class="fas fa-check"></i> د معلوماتو خوندیتوب لپاره منظم بیک اپونه وړاندیز کیږي</li>
                 </ul>
             </div>
         </div>
@@ -879,11 +924,11 @@ usort($backup_files, function($a, $b) {
         <!-- Backup Files Table -->
         <div class="table-container">
             <div class="table-header">
-                <h2><i class="fas fa-list"></i> Backup Files</h2>
+                <h2><i class="fas fa-list"></i> د بیک اپ فایلونه</h2>
                 <div class="table-actions">
                     <span class="backup-status status-success">
                         <i class="fas fa-circle"></i>
-                        <?php echo count($backup_files); ?> backups available
+                        <?php echo count($backup_files); ?> بیک اپونه شتون لري
                     </span>
                 </div>
             </div>
@@ -892,12 +937,12 @@ usort($backup_files, function($a, $b) {
             <div class="table-controls">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="searchInput" placeholder="Search backup files..." onkeyup="searchBackups()">
+                    <input type="text" id="searchInput" placeholder="د بیک اپ فایلونه پلټئ..." onkeyup="searchBackups()">
                 </div>
                 <select class="filter-select" id="filterSelect" onchange="filterBackups()">
-                    <option value="all">All Backups</option>
-                    <option value="recent">Last 7 Days</option>
-                    <option value="large">Large Files (>10MB)</option>
+                    <option value="all">ټول بیک اپونه</option>
+                    <option value="recent">وروستۍ ۷ ورځې</option>
+                    <option value="large">لوی فایلونه (>10MB)</option>
                 </select>
             </div>
 
@@ -906,10 +951,10 @@ usort($backup_files, function($a, $b) {
                     <table class="backup-table" id="backupTable">
                         <thead>
                             <tr>
-                                <th>File Name</th>
-                                <th>Size</th>
-                                <th>Modified Date</th>
-                                <th>Actions</th>
+                                <th>د فایل نوم</th>
+                                <th>اندازه</th>
+                                <th>د بدلون نېټه</th>
+                                <th>کړنې</th>
                             </tr>
                         </thead>
                         <tbody id="backupTableBody">
@@ -937,7 +982,7 @@ usort($backup_files, function($a, $b) {
                                         <?php echo $modifiedDate; ?>
                                         <?php if($isRecent): ?>
                                             <span class="backup-status status-success">
-                                                <i class="fas fa-clock"></i> Recent
+                                                <i class="fas fa-clock"></i> نوی
                                             </span>
                                         <?php endif; ?>
                                     </td>
@@ -946,15 +991,15 @@ usort($backup_files, function($a, $b) {
                                             <a href="backups/<?php echo urlencode($file['name']); ?>" 
                                                download 
                                                class="btn-action btn-download">
-                                                <i class="fas fa-download"></i> Download
+                                                <i class="fas fa-download"></i> ډاونلوډ
                                             </a>
                                             <button class="btn-action btn-restore" 
                                                     onclick="confirmRestore('<?php echo htmlspecialchars($file['name']); ?>')">
-                                                <i class="fas fa-history"></i> Restore
+                                                <i class="fas fa-history"></i> بحالول
                                             </button>
                                             <button class="btn-action btn-delete" 
                                                     onclick="confirmDelete('<?php echo htmlspecialchars($file['name']); ?>')">
-                                                <i class="fas fa-trash"></i> Delete
+                                                <i class="fas fa-trash"></i> ړنګول
                                             </button>
                                         </div>
                                     </td>
@@ -965,8 +1010,8 @@ usort($backup_files, function($a, $b) {
                 <?php else: ?>
                     <div class="empty-state">
                         <i class="fas fa-database"></i>
-                        <h3>No Backup Files Found</h3>
-                        <p>Create your first backup using the "Create New Backup" button above.</p>
+                        <h3>هیڅ بیک اپ فایل ونه موندل شو</h3>
+                        <p>د پورته "نوی بیک اپ جوړ کړئ" تڼۍ په کارولو سره خپل لومړی بیک اپ جوړ کړئ.</p>
                     </div>
                 <?php endif; ?>
             </div>
@@ -978,23 +1023,23 @@ usort($backup_files, function($a, $b) {
         <div class="modal-content">
             <div class="modal-header">
                 <i class="fas fa-history"></i>
-                <h2>Confirm Restore</h2>
+                <h2>د بحالولو تایید</h2>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to restore from backup <strong id="restoreFilename"></strong>?</p>
+                <p>ایا تاسو ډاډه یاست چې غواړئ د <strong id="restoreFilename"></strong> بیک اپ بحال کړئ؟</p>
                 <p style="color: var(--warning-color); font-size: 0.9rem; margin-top: 10px;">
-                    <i class="fas fa-warning"></i> This will replace ALL current data with the backup data!
+                    <i class="fas fa-warning"></i> دا به ټول اوسني معلومات د بیک اپ معلوماتو سره بدل کړي!
                 </p>
                 <p style="color: var(--danger-color); font-size: 0.9rem; margin-top: 10px;">
-                    <i class="fas fa-exclamation-triangle"></i> This action cannot be undone!
+                    <i class="fas fa-exclamation-triangle"></i> دا عمل بیرته نه شي راګرځیدلی!
                 </p>
             </div>
             <div class="modal-buttons">
                 <button class="btn btn-secondary" onclick="closeModal('restoreModal')">
-                    <i class="fas fa-times"></i> Cancel
+                    <i class="fas fa-times"></i> لغوه
                 </button>
                 <button class="btn btn-restore" id="confirmRestoreBtn">
-                    <i class="fas fa-history"></i> Restore Backup
+                    <i class="fas fa-history"></i> بیک اپ بحال کړئ
                 </button>
             </div>
         </div>
@@ -1005,20 +1050,20 @@ usort($backup_files, function($a, $b) {
         <div class="modal-content">
             <div class="modal-header">
                 <i class="fas fa-exclamation-triangle"></i>
-                <h2>Confirm Delete</h2>
+                <h2>د ړنګولو تایید</h2>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to delete backup file <strong id="deleteFilename"></strong>?</p>
+                <p>ایا تاسو ډاډه یاست چې غواړئ د <strong id="deleteFilename"></strong> بیک اپ فایل ړنګ کړئ؟</p>
                 <p style="color: var(--danger-color); font-size: 0.9rem; margin-top: 10px;">
-                    <i class="fas fa-warning"></i> This action cannot be undone!
+                    <i class="fas fa-warning"></i> دا عمل بیرته نه شي راګرځیدلی!
                 </p>
             </div>
             <div class="modal-buttons">
                 <button class="btn btn-secondary" onclick="closeModal('deleteModal')">
-                    <i class="fas fa-times"></i> Cancel
+                    <i class="fas fa-times"></i> لغوه
                 </button>
                 <button class="btn btn-delete" id="confirmDeleteBtn">
-                    <i class="fas fa-trash"></i> Delete Backup
+                    <i class="fas fa-trash"></i> بیک اپ ړنګ کړئ
                 </button>
             </div>
         </div>
@@ -1073,10 +1118,10 @@ usort($backup_files, function($a, $b) {
             const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
             
             rows.forEach(row => {
-                const date = parseInt(row.dataset.date);
+                const date = parseInt(row.dataset.date) * 1000;
                 const size = parseInt(row.dataset.size);
                 const isRecent = date > oneWeekAgo;
-                const isLarge = size > 10 * 1024 * 1024; // > 10MB
+                const isLarge = size > 10 * 1024 * 1024;
                 
                 let shouldShow = true;
                 
@@ -1092,12 +1137,12 @@ usort($backup_files, function($a, $b) {
 
         // Refresh page
         function refreshPage() {
-            window.location.reload();
+            window.location.href = window.location.pathname;
         }
 
         // Confirm backup creation
         function confirmBackup() {
-            return confirm('Are you sure you want to create a new backup? This may take a few moments.');
+            return confirm('ایا تاسو ډاډه یاست چې غواړئ نوی بیک اپ جوړ کړئ؟ دا ممکن څو شېبې وخت ونیسي.');
         }
 
         // Restore functionality
@@ -1157,7 +1202,7 @@ usort($backup_files, function($a, $b) {
         // Mobile touch handling
         document.addEventListener('touchstart', function() {}, {passive: true});
 
-        // Auto-refresh on success message
+        // Auto-hide success message after 5 seconds
         <?php if($success_message): ?>
             setTimeout(function() {
                 const alerts = document.querySelectorAll('.alert');
@@ -1169,16 +1214,5 @@ usort($backup_files, function($a, $b) {
             }, 5000);
         <?php endif; ?>
     </script>
-
-    <?php
-    // Helper function to format file size
-    function formatFileSize($bytes) {
-        if ($bytes === 0) return '0 Bytes';
-        $k = 1024;
-        $sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        $i = floor(log($bytes) / log($k));
-        return round($bytes / pow($k, $i), 2) . ' ' . $sizes[$i];
-    }
-    ?>
 </body>
 </html>
