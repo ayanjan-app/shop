@@ -1,0 +1,1236 @@
+/* sale_styles.css - Optimized for Quick Sales */
+:root {
+    --primary-color: #1a2980;
+    --secondary-color: #26d0ce;
+    --accent-color: #00ffea;
+    --success-color: #4CAF50;
+    --warning-color: #FF9800;
+    --danger-color: #f44336;
+    --text-color: #333;
+    --light-bg: #f8f9fa;
+    --card-bg: #ffffff;
+    --shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    --border-radius: 8px;
+    --transition: all 0.2s ease;
+}
+
+/* Layout Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+body {
+    background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
+    color: var(--text-color);
+    height: 100vh;
+    overflow: hidden;
+    font-size: 13px;
+}
+
+
+/* Page Header */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 10px 15px;
+    background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+    border-radius: var(--border-radius);
+    color: white;
+    box-shadow: var(--shadow);
+    flex-shrink: 0;
+}
+
+.page-header h1 {
+    font-size: 1.3rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.page-header h1 i {
+    color: var(--accent-color);
+}
+
+.shortcut-info {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+}
+
+.shortcut-badge i {
+    margin-right: 5px;
+}
+
+.today {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+}
+
+/* Compact Sale Form - Always visible */
+.compact-sale-form {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 12px;
+    margin-bottom: 10px;
+    box-shadow: var(--shadow);
+    flex-shrink: 0;
+}
+
+/* Quick Top Bar */
+.quick-top-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+.customer-quick-input {
+    flex: 2;
+    position: relative;
+    min-width: 200px;
+}
+
+.customer-quick-input i {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--secondary-color);
+    font-size: 0.9rem;
+}
+
+.quick-customer-input {
+    width: 100%;
+    padding: 8px 8px 8px 30px;
+    border: 2px solid #e0e7ff;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    transition: var(--transition);
+}
+
+.quick-customer-input:focus {
+    border-color: var(--secondary-color);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(38, 208, 206, 0.1);
+}
+
+.quick-fees {
+    display: flex;
+    gap: 5px;
+    flex: 1;
+}
+
+.fee-item {
+    position: relative;
+    flex: 1;
+}
+
+.fee-item i {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--secondary-color);
+    font-size: 0.8rem;
+}
+
+.quick-fee-input {
+    width: 100%;
+    padding: 8px 8px 8px 25px;
+    border: 2px solid #e0e7ff;
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.quick-totals {
+    flex: 1;
+    text-align: right;
+    padding: 0 10px;
+    background: #f0f4ff;
+    border-radius: 6px;
+    padding: 8px 12px;
+}
+
+.total-label {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.total-value {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    margin-left: 5px;
+}
+
+.btn-save-quick {
+    background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.btn-save-quick:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(26, 41, 128, 0.2);
+}
+
+/* Medicines Entry Table */
+.medicines-entry {
+    margin-bottom: 10px;
+    overflow-x: auto;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+#medicinesTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    min-width: 800px;
+}
+
+#medicinesTable thead {
+    background: linear-gradient(45deg, var(--primary-color), #0c2461);
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+#medicinesTable th {
+    padding: 8px 6px;
+    font-weight: 500;
+    text-align: left;
+    font-size: 0.8rem;
+}
+
+#medicinesTable td {
+    padding: 6px 4px;
+    border-bottom: 1px solid #eee;
+}
+
+/* Medicine Select Styling */
+.medicine-select-wrapper {
+    min-width: 200px;
+}
+
+.medicine-select {
+    width: 100%;
+    padding: 6px;
+    border: 2px solid #e0e7ff;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+/* Select2 Customization */
+.select2-container--default .select2-selection--single {
+    height: 32px;
+    border: 2px solid #e0e7ff;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: 28px;
+    padding-left: 8px;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 30px;
+}
+
+.select2-dropdown {
+    font-size: 0.8rem;
+}
+
+/* Table Inputs */
+#medicinesTable .price-out,
+#medicinesTable .bonus,
+#medicinesTable .qty {
+    width: 70px;
+    padding: 6px;
+    border: 2px solid #e0e7ff;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 0.8rem;
+}
+
+.stock-amount {
+    display: block;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+.subtotal {
+    font-weight: bold;
+    color: var(--primary-color);
+    font-size: 0.85rem;
+}
+
+.btn-remove {
+    background: var(--danger-color);
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-remove:hover {
+    background: #d32f2f;
+}
+
+.stock-warning {
+    color: var(--danger-color);
+    font-size: 0.7rem;
+    margin-top: 2px;
+}
+
+/* Payment Quick Row */
+.payment-quick-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding-top: 8px;
+    border-top: 1px solid #eee;
+}
+
+.payment-methods-quick {
+    display: flex;
+    gap: 10px;
+    background: #f0f4ff;
+    padding: 5px;
+    border-radius: 6px;
+}
+
+.radio-quick {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.radio-quick input[type="radio"] {
+    display: none;
+}
+
+.radio-quick span {
+    padding: 5px 10px;
+    background: white;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: var(--transition);
+}
+
+.radio-quick input[type="radio"]:checked + span {
+    background: var(--secondary-color);
+    color: white;
+}
+
+.payment-inputs {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.paid-input {
+    position: relative;
+    flex: 1;
+}
+
+.paid-input i {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--secondary-color);
+    font-size: 0.8rem;
+}
+
+.paid-input input {
+    width: 100%;
+    padding: 8px 8px 8px 25px;
+    border: 2px solid #e0e7ff;
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.balance-display {
+    background: #f8f9fa;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    min-width: 120px;
+}
+
+.btn-clear-all {
+    background: transparent;
+    color: var(--danger-color);
+    border: 2px solid var(--danger-color);
+    padding: 6px 15px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.btn-clear-all:hover {
+    background: rgba(244, 67, 54, 0.1);
+}
+
+/* Sales History Section - This is scrollable */
+.sales-history-scrollable {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 12px;
+    box-shadow: var(--shadow);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+}
+
+.history-header h3 {
+    font-size: 1rem;
+    color: var(--primary-color);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.history-controls {
+    display: flex;
+    gap: 5px;
+}
+
+.history-search {
+    padding: 6px 10px;
+    border: 2px solid #e0e7ff;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    width: 200px;
+}
+
+.history-filter {
+    padding: 6px;
+    border: 2px solid #e0e7ff;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    background: white;
+}
+
+.btn-refresh {
+    background: var(--secondary-color);
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-refresh:hover {
+    background: var(--primary-color);
+}
+
+/* Stats Mini */
+.stats-mini {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+}
+
+.stat-mini {
+    background: #f8f9fa;
+    padding: 8px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+}
+
+.stat-label {
+    color: #666;
+}
+
+.stat-value {
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+/* History Table Container - ONLY THIS SCROLLS */
+.history-table-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: auto;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    border: 1px solid #eee;
+}
+
+.history-table-container::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.history-table-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.history-table-container::-webkit-scrollbar-thumb {
+    background: var(--secondary-color);
+    border-radius: 4px;
+}
+
+.history-table-container::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-color);
+}
+
+#salesHistoryTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    min-width: 900px;
+}
+
+#salesHistoryTable thead {
+    background: linear-gradient(45deg, var(--primary-color), #0c2461);
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+#salesHistoryTable th {
+    padding: 8px 6px;
+    font-weight: 500;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+#salesHistoryTable td {
+    padding: 6px 4px;
+    border-bottom: 1px solid #eee;
+}
+
+/* Status Badges */
+.status-badge {
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.status-completed {
+    background: var(--success-color);
+    color: white;
+}
+
+.status-unpaid {
+    background: var(--warning-color);
+    color: white;
+}
+
+/* Table Action Buttons */
+.btn-sm {
+    padding: 4px 8px;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: var(--transition);
+    background: transparent;
+    color: var(--primary-color);
+}
+
+.btn-sm:hover {
+    background: #f0f4ff;
+}
+
+.btn-success {
+    background: var(--success-color);
+    color: white;
+}
+
+.btn-success:hover {
+    background: #45a049;
+}
+
+/* Pagination Mini */
+.pagination-mini {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    margin-top: 8px;
+    flex-shrink: 0;
+}
+
+.pagination-mini button {
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: var(--transition);
+    min-width: 28px;
+}
+
+.pagination-mini button:hover {
+    background: #f0f4ff;
+}
+
+.pagination-mini button.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+/* Loading States */
+.loading {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px;
+    color: #666;
+}
+
+.spinner {
+    width: 30px;
+    height: 30px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid var(--secondary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.empty-state {
+    display: none;
+    text-align: center;
+    padding: 30px;
+    color: #999;
+}
+
+.empty-state i {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    color: #ddd;
+}
+
+.empty-state h3 {
+    font-size: 1rem;
+    color: #666;
+}
+
+/* Modal */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 20px;
+    max-width: 350px;
+    width: 90%;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+}
+
+.modal-content h3 {
+    color: var(--primary-color);
+    margin-bottom: 5px;
+    font-size: 1.1rem;
+}
+
+.modal-content p {
+    color: #666;
+    margin-bottom: 15px;
+    font-size: 0.85rem;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 15px;
+}
+
+.btn {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.btn-primary {
+    background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+    color: white;
+}
+
+.btn-secondary {
+    background: #f0f4ff;
+    color: var(--text-color);
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .quick-top-bar {
+        flex-wrap: wrap;
+    }
+    
+    .customer-quick-input {
+        flex: 100%;
+    }
+    
+    .quick-fees {
+        flex: 1;
+    }
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        margin-left: 0;
+        padding: 10px;
+    }
+    
+    .page-header {
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-start;
+    }
+    
+    .payment-quick-row {
+        flex-wrap: wrap;
+    }
+    
+    .payment-methods-quick {
+        width: 100%;
+    }
+}
+
+/* Add to sale_styles.css in the Table Action Buttons section */
+
+.btn-warning {
+    background: transparent;
+    color: #ff9800;
+    border: 1px solid #ff9800;
+}
+
+.btn-warning:hover {
+    background: rgba(255, 152, 0, 0.1);
+}
+
+/* Update the button styles for consistency */
+.btn-sm {
+    padding: 4px 8px;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: var(--transition);
+    background: transparent;
+    color: var(--primary-color);
+    border: 1px solid currentColor;
+    min-width: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-sm:hover {
+    background: #f0f4ff;
+    transform: translateY(-1px);
+}
+
+.btn-success {
+    color: var(--success-color);
+    border-color: var(--success-color);
+}
+
+.btn-success:hover {
+    background: rgba(76, 175, 80, 0.1);
+}
+
+/* Tooltip for buttons */
+.btn-sm[title] {
+    position: relative;
+}
+
+.btn-sm[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    white-space: nowrap;
+    margin-bottom: 5px;
+    z-index: 10;
+}
+/* Enhanced medicine search styles */
+.select2-container--default .select2-results__option--highlighted .medicine-result-detail {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.medicine-result-detail {
+    font-size: 0.7rem;
+    margin-top: 2px;
+}
+
+/* Search field enhancement */
+.select2-search__field {
+    border-radius: 6px !important;
+    border: 2px solid #e0e7ff !important;
+    padding: 8px 10px !important;
+    font-size: 0.85rem !important;
+}
+
+.select2-search__field:focus {
+    border-color: var(--secondary-color) !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(38, 208, 206, 0.1) !important;
+}
+
+/* Medicine tags in dropdown */
+.medicine-tag {
+    display: inline-block;
+    background: #f0f4ff;
+    padding: 2px 6px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    margin-right: 4px;
+}
+
+.medicine-tag-gram {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.medicine-tag-type {
+    background: #f3e5f5;
+    color: #7b1fa2;
+}
+
+.medicine-tag-company {
+    background: #e8f5e9;
+    color: #388e3c;
+}
+/* Modern Medicine Search Component */
+.modern-medicine-selector {
+    position: relative;
+    min-width: 280px;
+}
+
+.search-container {
+    position: relative;
+}
+
+.search-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-icon-modern {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--secondary-color);
+    font-size: 0.9rem;
+    pointer-events: none;
+    z-index: 1;
+    transition: all 0.2s ease;
+}
+
+.medicine-search-input {
+    width: 100%;
+    padding: 10px 12px 10px 38px;
+    border: 2px solid #e0e7ff;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    background: white;
+    transition: all 0.2s ease;
+    outline: none;
+    font-family: inherit;
+}
+
+.medicine-search-input:focus {
+    border-color: var(--secondary-color);
+    box-shadow: 0 0 0 3px rgba(38, 208, 206, 0.1);
+}
+
+.medicine-search-input:focus + .search-icon-modern {
+    color: var(--primary-color);
+}
+
+.loading-icon {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--secondary-color);
+    font-size: 0.85rem;
+}
+
+.clear-search {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 2;
+}
+
+.clear-search:hover {
+    color: var(--danger-color);
+    transform: translateY(-50%) scale(1.1);
+}
+
+/* Search Results Dropdown */
+.search-results-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 5px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    border: 1px solid #e0e7ff;
+    z-index: 1000;
+    max-height: 400px;
+    overflow: hidden;
+    animation: dropdownSlideIn 0.2s ease;
+}
+
+@keyframes dropdownSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.results-header {
+    padding: 12px 15px;
+    background: linear-gradient(135deg, #f8f9fa, #fff);
+    border-bottom: 2px solid #e0e7ff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 1;
+}
+
+.results-header i {
+    margin-right: 5px;
+    color: var(--secondary-color);
+}
+
+.results-count {
+    background: #e0e7ff;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    color: var(--primary-color);
+}
+
+.results-list {
+    max-height: 340px;
+    overflow-y: auto;
+}
+
+/* Individual Medicine Result Item */
+.medicine-result-item {
+    padding: 12px 15px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.medicine-result-item:hover {
+    background: linear-gradient(135deg, #f0f7ff, #fff);
+    transform: translateX(2px);
+}
+
+.medicine-result-item.selected {
+    background: linear-gradient(135deg, #e8f0fe, #fff);
+    border-left: 3px solid var(--secondary-color);
+}
+
+.medicine-info {
+    flex: 1;
+}
+
+.medicine-name {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.medicine-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+.badge-gram {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.badge-type {
+    background: #f3e5f5;
+    color: #7b1fa2;
+}
+
+.badge-company {
+    background: #e8f5e9;
+    color: #388e3c;
+}
+
+.medicine-details {
+    font-size: 0.7rem;
+    color: #666;
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.medicine-details i {
+    margin-right: 3px;
+    font-size: 0.65rem;
+}
+
+.medicine-price-stock {
+    text-align: right;
+    min-width: 100px;
+}
+
+.price {
+    font-size: 1rem;
+    font-weight: bold;
+    color: var(--success-color);
+}
+
+.stock-info {
+    font-size: 0.7rem;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    justify-content: flex-end;
+}
+
+.stock-info i {
+    font-size: 0.65rem;
+}
+
+.stock-available {
+    color: #27ae60;
+}
+
+.stock-low {
+    color: #f39c12;
+}
+
+.stock-out {
+    color: #e74c3c;
+}
+
+/* No Results State */
+.no-results {
+    padding: 30px;
+    text-align: center;
+    color: #999;
+}
+
+.no-results i {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    color: #ddd;
+}
+
+.no-results p {
+    font-size: 0.85rem;
+    margin-top: 5px;
+}
+
+/* Loading State */
+.results-loading {
+    padding: 20px;
+    text-align: center;
+    color: var(--secondary-color);
+}
+
+.results-loading i {
+    font-size: 1.2rem;
+    margin-bottom: 8px;
+}
+
+/* Scrollbar Styling */
+.results-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.results-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.results-list::-webkit-scrollbar-thumb {
+    background: var(--secondary-color);
+    border-radius: 10px;
+}
+
+.results-list::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-color);
+}
+
+/* Animation for search */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.searching {
+    animation: pulse 0.5s ease-in-out infinite;
+}
+
+/* Stock Warning */
+.stock-warning {
+    margin-top: 5px;
+    padding: 5px 10px;
+    background: #fff3e0;
+    border-left: 3px solid var(--warning-color);
+    border-radius: 6px;
+    font-size: 0.7rem;
+    color: #e67e22;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.stock-warning i {
+    font-size: 0.7rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .modern-medicine-selector {
+        min-width: 200px;
+    }
+    
+    .medicine-result-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .medicine-price-stock {
+        text-align: left;
+        width: 100%;
+    }
+    
+    .stock-info {
+        justify-content: flex-start;
+    }
+}
