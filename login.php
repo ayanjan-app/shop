@@ -23,928 +23,481 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             header("Location: dashboard.php"); 
             exit; 
         } else { 
-            $login_error = "Wrong password"; 
+            $login_error = "پټ‌نوم غلط دی"; 
         } 
     } else { 
-        $login_error = "User not found"; 
+        $login_error = "کارن ونه موندل شو"; 
     } 
     $stmt->close(); 
 } 
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ps" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PharmaCare RX - Login</title>
-    <!-- Include Font Awesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>قرطاسیه · ننوتل</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Pashto font (Noto Naskh Arabic) -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Noto Naskh Arabic', 'Segoe UI', Tahoma, sans-serif;
+    }
 
-        :root {
-            --primary-color: #1a2980;
-            --secondary-color: #26d0ce;
-            --accent-color: #00ffea;
-            --error-color: #ff6b6b;
-            --text-color: #333;
-            --light-bg: rgba(255, 255, 255, 0.95);
-            --shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
-            --border-radius: 25px;
-        }
+    :root {
+      --card-bg: #ffffff;
+      --primary: #1e3c72;
+      --primary-soft: #2b4a7a;
+      --accent: #e6b12e;
+      --text-dark: #1f2937;
+      --text-soft: #4b5563;
+      --border-light: #e2e8f0;
+      --error-bg: #fee2e2;
+      --error-text: #b91c1c;
+      --shadow-sm: 0 8px 20px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.02);
+      --shadow-md: 0 16px 30px -8px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.04);
+      --radius-card: 28px;
+      --radius-input: 14px;
+    }
 
-        body {
-            background: linear-gradient(135deg, #0c2461, #1e3799, #4a69bd);
-            min-height: 100vh;
-            min-height: -webkit-fill-available;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow-x: hidden;
-            position: relative;
-            padding: 15px;
-            width: 100%;
-        }
+    body {
+      background: linear-gradient(145deg, #eef2f9 0%, #f9fcff 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      margin: 0;
+    }
 
-        html {
-            height: -webkit-fill-available;
-        }
+    /* ----- کارت اصلی ننوتلو ----- */
+    .login-card {
+      background: var(--card-bg);
+      max-width: 440px;
+      width: 100%;
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-md);
+      padding: 2.4rem 2rem 2rem;
+      transition: transform 0.2s ease;
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(2px);
+      position: relative;
+    }
 
-        /* Floating Pharmacy Items - Responsive */
-        .pharmacy-item {
-            position: absolute;
-            font-size: 1.5rem;
-            color: rgba(255, 255, 255, 0.7);
-            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            pointer-events: none;
-            z-index: 1;
-            filter: drop-shadow(0 5px 15px rgba(0, 0, 0, 0.3));
-            display: none; /* Hidden on very small screens */
-        }
+    @media (max-width: 480px) {
+      .login-card {
+        padding: 2rem 1.4rem 1.8rem;
+        border-radius: 24px;
+      }
+    }
 
-        /* Show items on tablets and above */
-        @media (min-width: 480px) {
-            .pharmacy-item {
-                display: block;
-                font-size: 1.8rem;
-            }
-        }
+    /* ----- برانډ / لوګو ----- */
+    .brand {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
 
-        @media (min-width: 768px) {
-            .pharmacy-item {
-                font-size: 2rem;
-            }
-        }
+    .brand-icon {
+      background: var(--primary);
+      width: 72px;
+      height: 72px;
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.1rem;
+      box-shadow: 0 12px 18px -6px rgba(30, 60, 114, 0.25);
+      color: white;
+      font-size: 2.2rem;
+      transition: background 0.2s;
+    }
 
-        .pharmacy-item:hover {
-            transform: scale(1.8) rotate(20deg);
-            color: #fff;
-            text-shadow: 0 0 20px var(--accent-color), 0 0 40px var(--accent-color);
-            z-index: 10;
-            pointer-events: auto;
-        }
+    .brand h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--primary);
+      margin-bottom: 0.3rem;
+    }
 
-        /* Position pharmacy items for different screen sizes */
-        .item-1 { top: 10%; left: 5%; }
-        .item-2 { top: 15%; right: 8%; }
-        .item-3 { bottom: 20%; left: 7%; }
-        .item-4 { bottom: 15%; right: 10%; }
-        .item-5 { top: 40%; left: 3%; }
-        .item-6 { top: 35%; right: 5%; }
-        .item-7 { bottom: 40%; left: 12%; }
-        .item-8 { bottom: 35%; right: 3%; }
-        .item-9 { top: 60%; left: 10%; }
-        .item-10 { top: 65%; right: 12%; }
+    .brand .subhead {
+      color: var(--text-soft);
+      font-size: 0.95rem;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f1f5f9;
+      padding: 0.3rem 1.2rem;
+      border-radius: 50px;
+      margin-top: 0.4rem;
+    }
 
-        /* Adjust positions for mobile */
-        @media (max-width: 767px) {
-            .pharmacy-item {
-                font-size: 1.5rem;
-            }
-            .item-1 { top: 5%; left: 5%; }
-            .item-2 { top: 5%; right: 5%; }
-            .item-3 { bottom: 5%; left: 5%; }
-            .item-4 { bottom: 5%; right: 5%; }
-            .item-5 { top: 20%; left: 3%; }
-            .item-6 { top: 20%; right: 3%; }
-            .item-7 { bottom: 20%; left: 10%; }
-            .item-8 { bottom: 20%; right: 3%; }
-            .item-9 { top: 70%; left: 5%; }
-            .item-10 { top: 70%; right: 5%; }
-        }
+    .brand .subhead i {
+      color: var(--accent);
+      font-size: 0.9rem;
+    }
 
-        @media (max-width: 480px) {
-            .pharmacy-item {
-                display: none; /* Hide on very small screens to reduce clutter */
-            }
-        }
+    /* ----- د تېروتنې پیغام ----- */
+    .error-message {
+      background: var(--error-bg);
+      color: var(--error-text);
+      padding: 0.9rem 1.1rem;
+      border-radius: 14px;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 1.7rem;
+      border-right: 5px solid #b91c1c;
+      font-weight: 600;
+      box-shadow: var(--shadow-sm);
+      animation: gentleShake 0.4s ease;
+    }
 
-        /* Login Container - Responsive */
-        .login-container {
-            background: var(--light-bg);
-            backdrop-filter: blur(10px);
-            border-radius: var(--border-radius);
-            width: 100%;
-            max-width: 450px;
-            min-width: 300px;
-            padding: 30px 25px;
-            box-shadow: var(--shadow);
-            position: relative;
-            z-index: 2;
-            overflow: hidden;
-            animation: containerAppear 1s ease-out;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            margin: 0 auto;
-        }
+    .error-message i {
+      font-size: 1.2rem;
+      color: #b91c1c;
+    }
 
-        @media (min-width: 480px) {
-            .login-container {
-                padding: 35px 30px;
-            }
-        }
+    @keyframes gentleShake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
 
-        @media (min-width: 768px) {
-            .login-container {
-                padding: 40px;
-                max-width: 420px;
-            }
-        }
+    /* ----- د فورمې ډکې ----- */
+    .form-group {
+      margin-bottom: 1.6rem;
+    }
 
-        @keyframes containerAppear {
-            0% { opacity: 0; transform: translateY(30px) scale(0.95); }
-            100% { opacity: 1; transform: translateY(0) scale(1); }
-        }
+    .form-label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--primary-soft);
+      margin-bottom: 0.6rem;
+    }
 
-        .login-container::before {
-            content: '';
-            position: absolute;
-            top: -2px; left: -2px; right: -2px; bottom: -2px;
-            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color), var(--accent-color), var(--primary-color));
-            z-index: -1;
-            border-radius: calc(var(--border-radius) + 2px);
-            animation: borderGlow 3s linear infinite;
-            background-size: 400%;
-        }
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
 
-        @keyframes borderGlow {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
+    /* آیکون په ښي اړخ کې (د RTL لپاره) */
+    .input-icon {
+      position: absolute;
+      right: 18px;
+      color: #94a3b8;
+      font-size: 1.1rem;
+      transition: color 0.2s;
+      pointer-events: none;
+    }
 
-        .login-container::after {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: var(--light-bg);
-            border-radius: var(--border-radius);
-            z-index: -1;
-        }
+    .form-input {
+      width: 100%;
+      padding: 1rem 3.2rem 1rem 1rem;
+      font-size: 1rem;
+      border: 1.5px solid var(--border-light);
+      border-radius: var(--radius-input);
+      background: #ffffff;
+      color: var(--text-dark);
+      transition: border 0.2s, box-shadow 0.2s;
+      outline: none;
+      font-weight: 500;
+      -webkit-appearance: none;
+      appearance: none;
+      text-align: right;
+    }
 
-        /* Logo - Responsive */
-        .logo {
-            text-align: center;
-            margin-bottom: 25px;
-            animation: logoFloat 3s ease-in-out infinite;
-        }
+    .form-input::placeholder {
+      color: #9ca3af;
+      font-weight: 400;
+      font-size: 0.95rem;
+    }
 
-        @media (max-width: 480px) {
-            .logo {
-                margin-bottom: 20px;
-            }
-        }
+    .form-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(30, 60, 114, 0.12);
+    }
 
-        @keyframes logoFloat {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-8px); }
-        }
+    .form-input:focus + .input-icon {
+      color: var(--primary);
+    }
 
-        .logo-icon {
-            font-size: 2.5rem;
-            color: var(--primary-color);
-            margin-bottom: 10px;
-            display: inline-block;
-            animation: spin 20s linear infinite;
-        }
+    /* د پټ‌نوم ښودلو تڼۍ */
+    .toggle-password {
+      position: absolute;
+      left: 18px;
+      color: #94a3b8;
+      font-size: 1.15rem;
+      cursor: pointer;
+      transition: color 0.2s;
+      background: transparent;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+    }
 
-        @media (min-width: 480px) {
-            .logo-icon {
-                font-size: 3rem;
-            }
-        }
+    .toggle-password:hover {
+      color: var(--primary);
+    }
 
-        @media (min-width: 768px) {
-            .logo-icon {
-                font-size: 3.5rem;
-            }
-        }
+    /* ----- د ننوتلو تڼۍ ----- */
+    .btn-login {
+      width: 100%;
+      background: var(--primary);
+      color: white;
+      font-weight: 700;
+      font-size: 1.1rem;
+      padding: 1rem 1.8rem;
+      border: none;
+      border-radius: var(--radius-input);
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 0.6rem;
+      box-shadow: 0 8px 16px -6px rgba(30, 60, 114, 0.3);
+      -webkit-tap-highlight-color: transparent;
+    }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+    .btn-login i {
+      font-size: 1.15rem;
+    }
 
-        .logo h1 { 
-            color: var(--primary-color); 
-            font-size: 1.5rem;
-            font-weight: 700; 
-            letter-spacing: 0.5px;
-            margin-bottom: 5px;
-        }
-        
-        @media (min-width: 480px) {
-            .logo h1 {
-                font-size: 1.8rem;
-            }
-        }
-        
-        @media (min-width: 768px) {
-            .logo h1 {
-                font-size: 2rem;
-            }
-        }
+    .btn-login:hover {
+      background: #15315a;
+      box-shadow: 0 12px 22px -8px rgba(30, 60, 114, 0.4);
+    }
 
-        .logo p { 
-            color: var(--secondary-color); 
-            font-size: 0.9rem;
-            margin-top: 5px; 
-            font-weight: 500; 
-        }
-        
-        @media (min-width: 480px) {
-            .logo p {
-                font-size: 1rem;
-            }
-        }
+    .btn-login:active {
+      transform: scale(0.98);
+    }
 
-        /* Error Message - Responsive */
-        .error-message {
-            background: linear-gradient(45deg, var(--error-color), #ee5a52);
-            color: white;
-            padding: 12px 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            animation: errorShake 0.5s ease;
-            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.3);
-            font-size: 0.9rem;
-        }
+    .btn-login:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+      background: #4b5e7a;
+      box-shadow: none;
+    }
 
-        @media (min-width: 480px) {
-            .error-message {
-                padding: 15px;
-                font-size: 1rem;
-            }
-        }
+    /* ----- د پاڼې ښکته برخه ----- */
+    .login-footer {
+      margin-top: 1.8rem;
+      text-align: center;
+      color: var(--text-soft);
+      font-size: 0.8rem;
+      border-top: 1px solid var(--border-light);
+      padding-top: 1.4rem;
+    }
 
-        @keyframes errorShake {
-            0%, 100% { transform: translateX(0); }
-            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-            20%, 40%, 60%, 80% { transform: translateX(5px); }
-        }
+    .security-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 1rem;
+      color: #64748b;
+      font-size: 0.78rem;
+      background: #f1f5f9;
+      padding: 0.5rem 1.2rem;
+      border-radius: 40px;
+      width: fit-content;
+      margin-left: auto;
+      margin-right: auto;
+    }
 
-        .error-message i { 
-            margin-right: 10px; 
-            font-size: 1.1rem;
-            flex-shrink: 0;
-        }
+    .security-badge i {
+      color: #22a06b;
+      font-size: 0.85rem;
+    }
 
-        /* Form Styling - Responsive */
-        .form-group { 
-            margin-bottom: 20px; 
-            position: relative; 
-        }
-        
-        @media (min-width: 480px) {
-            .form-group {
-                margin-bottom: 25px;
-            }
-        }
+    /* ----- د بارولو پوښ ----- */
+    .loading-overlay {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: var(--radius-card);
+      z-index: 20;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      backdrop-filter: blur(3px);
+    }
 
-        .form-label { 
-            display: block; 
-            margin-bottom: 8px; 
-            color: var(--primary-color); 
-            font-weight: 600; 
-            font-size: 0.85rem;
-            text-transform: uppercase; 
-            letter-spacing: 0.5px; 
-        }
-        
-        @media (min-width: 480px) {
-            .form-label {
-                font-size: 0.9rem;
-            }
-        }
+    .spinner {
+      width: 46px;
+      height: 46px;
+      border: 4px solid #e2e8f0;
+      border-top: 4px solid var(--primary);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+      margin-bottom: 1rem;
+    }
 
-        .input-group { 
-            position: relative; 
-        }
-        
-        .input-icon {
-            position: absolute;
-            left: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--secondary-color);
-            font-size: 1.1rem;
-            transition: all 0.3s;
-            z-index: 1;
-        }
-        
-        @media (min-width: 480px) {
-            .input-icon {
-                font-size: 1.2rem;
-            }
-        }
+    .loading-text {
+      color: var(--primary);
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
 
-        .form-input {
-            width: 100%;
-            padding: 14px 15px 14px 45px;
-            border: 2px solid transparent;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.9);
-            font-size: 1rem;
-            color: var(--text-color);
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-            -webkit-appearance: none;
-            appearance: none;
-        }
-        
-        @media (min-width: 480px) {
-            .form-input {
-                padding: 15px 15px 15px 50px;
-                font-size: 1.05rem;
-            }
-        }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
 
-        .form-input:focus {
-            outline: none;
-            border-color: var(--secondary-color);
-            box-shadow: 0 0 0 3px rgba(38, 208, 206, 0.3), 0 10px 20px rgba(0, 0, 0, 0.1);
-            transform: translateY(-2px);
-        }
-        
-        .form-input:focus + .input-icon {
-            color: var(--primary-color);
-            transform: translateY(-50%) scale(1.1);
-        }
-
-        /* Password Toggle */
-        .password-toggle {
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #999;
-            cursor: pointer;
-            transition: color 0.3s;
-            z-index: 2;
-            font-size: 1.1rem;
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        @media (min-width: 480px) {
-            .password-toggle {
-                font-size: 1.2rem;
-            }
-        }
-        
-        .password-toggle:hover { 
-            color: var(--secondary-color); 
-        }
-
-        /* Login Button - Responsive */
-        .btn-login {
-            width: 100%;
-            padding: 15px;
-            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            position: relative;
-            overflow: hidden;
-            margin-top: 10px;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            box-shadow: 0 10px 20px rgba(26, 41, 128, 0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            -webkit-tap-highlight-color: transparent;
-        }
-        
-        @media (min-width: 480px) {
-            .btn-login {
-                padding: 16px;
-                font-size: 1.05rem;
-            }
-        }
-
-        .btn-login:hover,
-        .btn-login:focus {
-            transform: translateY(-3px);
-            box-shadow: 0 15px 30px rgba(26, 41, 128, 0.3);
-            background: linear-gradient(45deg, var(--secondary-color), var(--primary-color));
-        }
-        
-        .btn-login:active { 
-            transform: translateY(-1px); 
-        }
-        
-        .btn-login:before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            transition: 0.5s;
-        }
-        
-        .btn-login:hover:before { 
-            left: 100%; 
-        }
-
-        /* Footer - Responsive */
-        .login-footer { 
-            text-align: center; 
-            margin-top: 20px; 
-            color: #666; 
-            font-size: 0.8rem;
-            line-height: 1.4;
-        }
-        
-        @media (min-width: 480px) {
-            .login-footer {
-                font-size: 0.85rem;
-                margin-top: 25px;
-            }
-        }
-
-        .forgot-password { 
-            color: var(--secondary-color); 
-            text-decoration: none; 
-            font-weight: 500; 
-            transition: all 0.3s; 
-            position: relative; 
-            display: inline-block; 
-            padding: 3px 0;
-            white-space: nowrap;
-        }
-        
-        .forgot-password:after {
-            content: '';
-            position: absolute;
-            width: 0;
-            height: 2px;
-            bottom: 0;
-            left: 0;
-            background: var(--secondary-color);
-            transition: width 0.3s;
-        }
-        
-        .forgot-password:hover:after { 
-            width: 100%; 
-        }
-
-        /* Security Message - Responsive */
-        .security-message { 
-            text-align: center; 
-            margin-top: 15px; 
-            font-size: 0.75rem;
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            color: #666; 
-            flex-wrap: wrap;
-            gap: 5px;
-        }
-        
-        @media (min-width: 480px) {
-            .security-message {
-                font-size: 0.8rem;
-                margin-top: 20px;
-            }
-        }
-        
-        .security-message i { 
-            color: var(--secondary-color); 
-            animation: pulse 2s infinite; 
-            font-size: 0.9rem;
-        }
-        
-        @keyframes pulse { 
-            0% { transform: scale(1); } 
-            50% { transform: scale(1.1); } 
-            100% { transform: scale(1); } 
-        }
-
-        /* Loading Overlay - Responsive */
-        .loading { 
-            display: none; 
-            position: absolute; 
-            top: 0; 
-            left: 0; 
-            right: 0; 
-            bottom: 0; 
-            background: rgba(255, 255, 255, 0.95); 
-            border-radius: var(--border-radius); 
-            z-index: 10; 
-            justify-content: center; 
-            align-items: center; 
-            flex-direction: column; 
-        }
-        
-        .spinner { 
-            width: 40px; 
-            height: 40px; 
-            border: 4px solid #f3f3f3; 
-            border-top: 4px solid var(--secondary-color); 
-            border-radius: 50%; 
-            animation: spin 1s linear infinite; 
-            margin-bottom: 15px; 
-        }
-        
-        @media (min-width: 480px) {
-            .spinner {
-                width: 50px;
-                height: 50px;
-                border-width: 5px;
-            }
-        }
-        
-        .loading-text { 
-            color: var(--primary-color); 
-            font-weight: 600; 
-            font-size: 1rem;
-        }
-        
-        @media (min-width: 480px) {
-            .loading-text {
-                font-size: 1.1rem;
-            }
-        }
-
-        /* Special Mobile Optimizations */
-        @media (max-width: 320px) {
-            .login-container {
-                padding: 20px 15px;
-                border-radius: 20px;
-            }
-            
-            .logo-icon {
-                font-size: 2.2rem;
-            }
-            
-            .logo h1 {
-                font-size: 1.3rem;
-            }
-            
-            .form-input {
-                padding: 12px 12px 12px 40px;
-                font-size: 0.95rem;
-            }
-            
-            .btn-login {
-                padding: 14px;
-                font-size: 0.95rem;
-            }
-            
-            .input-icon {
-                font-size: 1rem;
-                left: 12px;
-            }
-        }
-
-        /* Tablet Optimizations */
-        @media (min-width: 768px) and (max-width: 1024px) {
-            .login-container {
-                max-width: 400px;
-            }
-            
-            body {
-                padding: 30px;
-            }
-        }
-
-        /* Landscape Mode */
-        @media (max-height: 600px) and (orientation: landscape) {
-            body {
-                padding: 10px;
-                align-items: flex-start;
-                min-height: auto;
-            }
-            
-            .login-container {
-                margin: 10px auto;
-                max-width: 400px;
-            }
-            
-            .logo {
-                margin-bottom: 15px;
-            }
-            
-            .form-group {
-                margin-bottom: 15px;
-            }
-            
-            .login-footer {
-                margin-top: 15px;
-            }
-            
-            .pharmacy-item {
-                display: none; /* Hide in landscape to save space */
-            }
-        }
-
-        /* Large Screens */
-        @media (min-width: 1200px) {
-            .login-container {
-                max-width: 450px;
-            }
-        }
-
-        /* Very Large Screens */
-        @media (min-width: 1600px) {
-            .login-container {
-                max-width: 500px;
-                padding: 50px;
-            }
-            
-            .logo-icon {
-                font-size: 4rem;
-            }
-            
-            .logo h1 {
-                font-size: 2.5rem;
-            }
-            
-            .logo p {
-                font-size: 1.2rem;
-            }
-            
-            .form-input {
-                font-size: 1.1rem;
-                padding: 18px 18px 18px 60px;
-            }
-            
-            .input-icon {
-                font-size: 1.4rem;
-                left: 20px;
-            }
-            
-            .password-toggle {
-                font-size: 1.4rem;
-                right: 20px;
-            }
-            
-            .btn-login {
-                padding: 20px;
-                font-size: 1.2rem;
-            }
-        }
-
-        /* Prevent zoom on iOS input focus */
-        @media (max-width: 767px) {
-            input, select, textarea {
-                font-size: 16px !important;
-            }
-            
-            .form-input:focus {
-                font-size: 16px !important;
-            }
-        }
-
-        /* Touch device optimizations */
-        @media (hover: none) and (pointer: coarse) {
-            .btn-login:hover {
-                transform: none;
-            }
-            
-            .password-toggle:hover {
-                color: #999;
-            }
-            
-            .forgot-password:hover:after {
-                width: 0;
-            }
-        }
-    </style>
+    /* کوچني سکرین لپاره سمونونه */
+    @media (max-width: 360px) {
+      .brand h1 {
+        font-size: 1.7rem;
+      }
+      .form-input {
+        padding-right: 2.8rem;
+        padding-left: 0.8rem;
+        font-size: 0.95rem;
+      }
+      .input-icon {
+        right: 14px;
+      }
+      .toggle-password {
+        left: 14px;
+      }
+    }
+  </style>
 </head>
 <body>
-    <!-- Floating Pharmacy Items -->
-    <div class="pharmacy-item item-1"><i class="fas fa-pills"></i></div>
-    <div class="pharmacy-item item-2"><i class="fas fa-prescription-bottle-alt"></i></div>
-    <div class="pharmacy-item item-3"><i class="fas fa-syringe"></i></div>
-    <div class="pharmacy-item item-4"><i class="fas fa-heartbeat"></i></div>
-    <div class="pharmacy-item item-5"><i class="fas fa-capsules"></i></div>
-    <div class="pharmacy-item item-6"><i class="fas fa-stethoscope"></i></div>
-    <div class="pharmacy-item item-7"><i class="fas fa-thermometer"></i></div>
-    <div class="pharmacy-item item-8"><i class="fas fa-band-aid"></i></div>
-    <div class="pharmacy-item item-9"><i class="fas fa-hospital"></i></div>
-    <div class="pharmacy-item item-10"><i class="fas fa-tablets"></i></div>
 
-    <!-- Login Container -->
-    <div class="login-container">
-        <div class="loading" id="loadingOverlay">
-            <div class="spinner"></div>
-            <div class="loading-text">Authenticating...</div>
-        </div>
-
-        <!-- Logo -->
-        <div class="logo">
-            <div class="logo-icon"><i class="fas fa-clinic-medical"></i></div>
-            <h1>PharmaCare RX</h1>
-            <p>Pharmacy Management System</p>
-        </div>
-
-        <!-- Error Message -->
-        <?php if(!empty($login_error)): ?>
-        <div class="error-message">
-            <i class="fas fa-exclamation-triangle"></i>
-            <span><?php echo htmlspecialchars($login_error); ?></span>
-        </div>
-        <?php endif; ?>
-
-        <!-- Login Form -->
-        <form method="POST" id="loginForm">
-            <div class="form-group">
-                <label class="form-label">Username</label>
-                <div class="input-group">
-                    <div class="input-icon"><i class="fas fa-user-md"></i></div>
-                    <input type="text" name="username" class="form-input" placeholder="Enter your username" required autocomplete="username" value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>">
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Password</label>
-                <div class="input-group">
-                    <div class="input-icon"><i class="fas fa-lock"></i></div>
-                    <input type="password" name="password" class="form-input" id="passwordInput" placeholder="Enter your password" required autocomplete="current-password">
-                    <div class="password-toggle" id="passwordToggle" aria-label="Show password"><i class="fas fa-eye"></i></div>
-                </div>
-            </div>
-
-            <button type="submit" class="btn-login" aria-label="Login to dashboard">
-                <i class="fas fa-sign-in-alt"></i> 
-                <span>Login to Dashboard</span>
-            </button>
-        </form>
-
-        <!-- Security Message -->
-        <div class="security-message">
-            <i class="fas fa-shield-alt"></i>
-            <span>Secure SSL Encrypted Connection</span>
-        </div>
-
-        <!-- Footer -->
-        <div class="login-footer">
-            <p>© <?php echo date('Y'); ?> PharmaCare RX. All rights reserved.</p>
-            <p><a href="#" class="forgot-password">Forgot Password?</a></p>
-        </div>
+  <div class="login-card">
+    <!-- د بارولو پوښ -->
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="spinner"></div>
+      <div class="loading-text">ننوتل روان دي…</div>
     </div>
 
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const loginForm = document.getElementById('loginForm');
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        const passwordInput = document.getElementById('passwordInput');
-        const passwordToggle = document.getElementById('passwordToggle');
-        const pharmacyItems = document.querySelectorAll('.pharmacy-item');
-        const btnLoginText = document.querySelector('.btn-login span');
-        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    <!-- برانډ -->
+    <div class="brand">
+      <div class="brand-icon">
+        <i class="fas fa-pen-fancy"></i>
+      </div>
+      <h1>حاجی نادر او نقیب حقمل </h1>
+      <div class="subhead">
+        <i class="fas fa-book-open"></i> 
+        <span>بنجاره پلورنحٔی  </span>
+      </div>
+    </div>
 
-        // Password toggle
-        passwordToggle.addEventListener('click', function() {
-            const type = passwordInput.type === 'password' ? 'text' : 'password';
-            passwordInput.type = type;
-            this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
-            this.setAttribute('aria-label', type === 'password' ? 'Show password' : 'Hide password');
+    <!-- د تېروتنې پیغام (د PHP له مخې) -->
+    <?php if (!empty($login_error)): ?>
+    <div class="error-message">
+      <i class="fas fa-circle-exclamation"></i>
+      <span><?php echo htmlspecialchars($login_error); ?></span>
+    </div>
+    <?php endif; ?>
+
+    <!-- د ننوتلو فورمه -->
+    <form method="POST" id="loginForm">
+      <div class="form-group">
+        <label class="form-label" for="username">کارن نوم</label>
+        <div class="input-wrapper">
+          <i class="fas fa-user input-icon"></i>
+          <input type="text" name="username" id="username" class="form-input" 
+                 placeholder="خپل کارن نوم ولیکئ" 
+                 required autocomplete="username"
+                 value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="passwordInput">پټ‌نوم</label>
+        <div class="input-wrapper">
+          <i class="fas fa-lock input-icon"></i>
+          <input type="password" name="password" id="passwordInput" class="form-input" 
+                 placeholder="••••••••" required autocomplete="current-password">
+          <button type="button" class="toggle-password" id="passwordToggle" aria-label="پټ‌نوم ښودل">
+            <i class="fas fa-eye"></i>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-login" id="loginBtn">
+        <i class="fas fa-arrow-right-to-bracket"></i>
+        <span>ننوتل</span>
+      </button>
+    </form>
+
+    <!-- د پاڼې ښکته برخه (پرته د پټ‌نوم هېرولو لینک) -->
+    <div class="login-footer">
+      <div class="security-badge">
+        <i class="fas fa-shield-halved"></i>
+        <span>خوندي اړیکه · 0707843558  کوډ شوی</span>
+      </div>
+      <p style="margin-top: 1.2rem; font-size: 0.75rem; color: #94a3b8;">
+        © <?php echo date('Y'); ?> رفیع الله احمدزی. ټول حقوق خوندي دي.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      // د پټ‌نوم ښودل/پټول
+      const passwordInput = document.getElementById('passwordInput');
+      const toggleBtn = document.getElementById('passwordToggle');
+      
+      if (toggleBtn && passwordInput) {
+        toggleBtn.addEventListener('click', function() {
+          const type = passwordInput.type === 'password' ? 'text' : 'password';
+          passwordInput.type = type;
+          this.innerHTML = type === 'password' 
+            ? '<i class="fas fa-eye"></i>' 
+            : '<i class="fas fa-eye-slash"></i>';
+          this.setAttribute('aria-label', type === 'password' ? 'پټ‌نوم ښودل' : 'پټ‌نوم پټول');
         });
+      }
 
-        // Show loading overlay on submit
+      // د بارولو پوښ او د تڼۍ غیر فعالول
+      const loginForm = document.getElementById('loginForm');
+      const loadingOverlay = document.getElementById('loadingOverlay');
+      const loginBtn = document.getElementById('loginBtn');
+      
+      if (loginForm) {
         loginForm.addEventListener('submit', function(e) {
-            loadingOverlay.style.display = 'flex';
-            btnLoginText.textContent = 'Logging in...';
-            
-            // Disable form resubmission
-            setTimeout(() => {
-                const submitBtn = this.querySelector('button[type="submit"]');
-                submitBtn.disabled = true;
-            }, 100);
+          if (loadingOverlay) loadingOverlay.style.display = 'flex';
+          
+          if (loginBtn) {
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i><span>ننوتل روان دي…</span>';
+          }
         });
+      }
 
-        // Interactive floating items (only on non-touch devices)
-        if (!isTouchDevice && window.innerWidth > 480) {
-            pharmacyItems.forEach(item => {
-                const randomX = (Math.random() - 0.5) * 20;
-                const randomY = (Math.random() - 0.5) * 20;
-                item.style.transform = `translate(${randomX}px, ${randomY}px)`;
+      // فوکس پر کارن نوم که خالي وي
+      const usernameField = document.getElementById('username');
+      if (usernameField && !usernameField.value) {
+        setTimeout(() => {
+          usernameField.focus();
+        }, 200);
+      }
 
-                document.addEventListener('mousemove', (e) => {
-                    const rect = item.getBoundingClientRect();
-                    const itemCenterX = rect.left + rect.width / 2;
-                    const itemCenterY = rect.top + rect.height / 2;
-                    const mouseX = e.clientX;
-                    const mouseY = e.clientY;
-                    const distance = Math.sqrt((mouseX - itemCenterX)**2 + (mouseY - itemCenterY)**2);
-
-                    if(distance < 150) {
-                        const force = (150 - distance)/150;
-                        const angle = Math.atan2(mouseY - itemCenterY, mouseX - itemCenterX);
-                        const moveX = Math.cos(angle + Math.PI) * force * 30;
-                        const moveY = Math.sin(angle + Math.PI) * force * 30;
-                        item.style.transform = `translate(${moveX}px, ${moveY}px) scale(${1 + force * 0.3})`;
-                        item.style.color = `rgba(255,255,255,${0.7 + force * 0.3})`;
-                    } else {
-                        item.style.transform = `translate(${randomX}px, ${randomY}px) scale(1)`;
-                        item.style.color = 'rgba(255, 255, 255, 0.7)';
-                    }
-                });
-
-                item.addEventListener('click', function(){
-                    this.style.transform += ' scale(1.5)';
-                    this.style.color = '#00ffea';
-                    this.style.textShadow = '0 0 20px #00ffea';
-                    setTimeout(() => {
-                        this.style.transform = `translate(${randomX}px, ${randomY}px) scale(1)`;
-                        this.style.color = 'rgba(255, 255, 255, 0.7)';
-                        this.style.textShadow = 'none';
-                    }, 500);
-                });
-            });
-        } else {
-            // For touch devices, make items clickable but don't add mouse move effects
-            pharmacyItems.forEach(item => {
-                item.style.pointerEvents = 'auto';
-                item.addEventListener('click', function() {
-                    this.style.transform = 'scale(1.5)';
-                    this.style.color = '#00ffea';
-                    this.style.textShadow = '0 0 20px #00ffea';
-                    setTimeout(() => {
-                        this.style.transform = 'scale(1)';
-                        this.style.color = 'rgba(255, 255, 255, 0.7)';
-                        this.style.textShadow = 'none';
-                    }, 500);
-                });
-            });
-        }
-
-        // Adjust floating items on window resize
-        let resizeTimeout;
-        window.addEventListener('resize', function() {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(() => {
-                if (!isTouchDevice && window.innerWidth > 480) {
-                    pharmacyItems.forEach(item => {
-                        const randomX = (Math.random() - 0.5) * 20;
-                        const randomY = (Math.random() - 0.5) * 20;
-                        item.style.transform = `translate(${randomX}px, ${randomY}px)`;
-                    });
-                }
-            }, 250);
-        });
-
-        // Focus on username field on page load
-        const usernameInput = document.querySelector('input[name="username"]');
-        if (usernameInput && !usernameInput.value) {
-            setTimeout(() => {
-                usernameInput.focus();
-            }, 300);
-        }
-
-        // Prevent form submission on Enter key in password field if not on mobile
-        if (window.innerWidth > 768) {
-            passwordInput.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    loginForm.requestSubmit();
-                }
-            });
-        }
-    });
-
-    // Prevent iOS zoom on input focus
-    document.addEventListener('touchstart', function() {}, {passive: true});
-    </script>
+      // د iOS د زوم مخنیوی لپاره
+      document.addEventListener('touchstart', function(){}, { passive: true });
+    })();
+  </script>
 </body>
 </html>
