@@ -436,7 +436,7 @@ $is_admin = ($current_user === 'admin');
                 <a href="item.php"><i class="fas fa-warehouse"></i> ګدام</a>
             </li>
             <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'companies.php' ? 'active' : ''; ?>">
-                <a href="companies.php"><i class="fas fa-building"></i> شرکتونه</a>
+                <a href="sarafe.php"><i class="fas fa-building"></i> صراف پیسی</a>
             </li>
             <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'backup_manager.php' ? 'active' : ''; ?>">
                 <a href="backup_manager.php"><i class="fas fa-database"></i> بیک اپ مدیر</a>
