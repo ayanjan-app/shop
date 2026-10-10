@@ -17,9 +17,9 @@ if (isset($_POST['add_expense'])) {
             VALUES ('$amount', '$used_for', '$person', '$expense_date')";
 
     if (mysqli_query($conn, $sql)) {
-        $success_msg = "Expense added successfully!";
+        $success_msg = "لګښت په بریالیتوب سره اضافه شو!";
     } else {
-        $error_msg = "Error: " . mysqli_error($conn);
+        $error_msg = "تېروتنه: " . mysqli_error($conn);
     }
 }
 
@@ -70,75 +70,111 @@ $total_result = mysqli_query($conn, $total_sql);
 $total_data = mysqli_fetch_assoc($total_result);
 $total = $total_data['total'] ?? 0;
 
+// =========================
+// STATS
+// =========================
+
+$count_sql = "SELECT COUNT(*) AS cnt FROM expenses $where";
+$count_result = mysqli_query($conn, $count_sql);
+$count_data = mysqli_fetch_assoc($count_result);
+$expense_count = $count_data['cnt'] ?? 0;
+
+$today_sql = "SELECT SUM(amount) AS today_total FROM expenses WHERE expense_date = CURDATE()";
+$today_result = mysqli_query($conn, $today_sql);
+$today_data = mysqli_fetch_assoc($today_result);
+$today_total = $today_data['today_total'] ?? 0;
+
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ps" dir="rtl">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expenses - PharmaCare RX</title>
+    <title>لګښتونه · قرطاسیه</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
         :root {
-            --primary: #1a2980;
-            --secondary: #26d0ce;
-            --accent: #00ffea;
-            --dark: #0c2461;
-            --success: #2ecc71;
-            --danger: #ff6b6b;
-            --warning: #f39c12;
-            --text-dark: #2c3e50;
-            --text-muted: #7f8c8d;
-            --bg-light: #f4f7fb;
-            --card-shadow: 0 4px 20px rgba(26, 41, 128, 0.08);
-            --card-shadow-hover: 0 8px 30px rgba(26, 41, 128, 0.15);
-            --border-radius: 14px;
+            --primary-color: #1e3c72;
+            --secondary-color: #2b4a7a;
+            --accent-color: #e6b12e;
+            --success-color: #22c55e;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --info-color: #3b82f6;
+            --text-color: #1f2937;
+            --text-muted: #64748b;
+            --card-bg: #ffffff;
+            --bg-light: #f1f5f9;
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+            --shadow-hover: 0 20px 40px rgba(0, 0, 0, 0.1);
+            --border-radius: 16px;
+            --transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
         * {
+            margin: 0;
+            padding: 0;
             box-sizing: border-box;
+            font-family: 'Noto Naskh Arabic', 'Segoe UI', Tahoma, sans-serif;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 30px 40px;
             background: var(--bg-light);
-            color: var(--text-dark);
+            color: var(--text-color);
             min-height: 100vh;
-            width: 85%;
+            font-size: 14px;
+            line-height: 1.6;
+                        margin-top: -50px;
+
+        }
+
+        /* ===== Main Content ===== */
+        .main-content {
+            padding: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+               
+            }
         }
 
         /* ===== Page Header ===== */
         .page-header {
             display: flex;
-            align-items: center;
             justify-content: space-between;
+            align-items: center;
             margin-bottom: 25px;
             flex-wrap: wrap;
             gap: 15px;
+            padding: 18px 24px;
+            background: var(--primary-color);
+            border-radius: var(--border-radius);
+            color: white;
+            box-shadow: var(--shadow);
         }
 
         .page-header h1 {
-            font-size: 1.8rem;
-            color: var(--primary);
-            margin: 0;
+            font-size: 1.6rem;
             display: flex;
             align-items: center;
             gap: 12px;
+            font-weight: 700;
+            margin: 0;
         }
 
         .page-header h1 i {
-            color: var(--secondary);
+            color: var(--accent-color);
         }
 
         .page-header .subtitle {
-            color: var(--text-muted);
-            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.85rem;
             margin-top: 5px;
         }
 
@@ -147,55 +183,53 @@ $total = $total_data['total'] ?? 0;
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 20px;
-            margin-bottom: 30px;
+            margin-bottom: 25px;
         }
 
         .stat-card {
-            background: white;
+            background: var(--card-bg);
             border-radius: var(--border-radius);
-            padding: 22px;
-            box-shadow: var(--card-shadow);
+            padding: 24px 20px;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+            border: 1px solid #e2e8f0;
             display: flex;
             align-items: center;
             gap: 18px;
-            transition: all 0.3s ease;
-            border-left: 4px solid var(--secondary);
         }
 
         .stat-card:hover {
             transform: translateY(-4px);
-            box-shadow: var(--card-shadow-hover);
+            box-shadow: var(--shadow-hover);
         }
 
         .stat-icon {
-            width: 55px;
-            height: 55px;
-            border-radius: 12px;
+            width: 60px;
+            height: 60px;
+            border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.4rem;
+            font-size: 1.5rem;
             color: white;
             flex-shrink: 0;
         }
 
         .stat-icon.total {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            background: var(--primary-color);
         }
 
         .stat-icon.count {
-            background: linear-gradient(135deg, #f39c12, #e67e22);
+            background: var(--accent-color);
         }
 
         .stat-icon.today {
-            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            background: var(--success-color);
         }
 
         .stat-info h3 {
             margin: 0;
             font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
             color: var(--text-muted);
             font-weight: 600;
         }
@@ -204,10 +238,14 @@ $total = $total_data['total'] ?? 0;
             margin: 6px 0 0;
             font-size: 1.5rem;
             font-weight: 700;
-            color: var(--primary);
+            color: var(--primary-color);
         }
 
-        /* ===== Layout: Form + Table ===== */
+        .stat-card:nth-child(1) { border-top: 4px solid var(--primary-color); }
+        .stat-card:nth-child(2) { border-top: 4px solid var(--accent-color); }
+        .stat-card:nth-child(3) { border-top: 4px solid var(--success-color); }
+
+        /* ===== Content Grid ===== */
         .content-grid {
             display: grid;
             grid-template-columns: 380px 1fr;
@@ -223,30 +261,43 @@ $total = $total_data['total'] ?? 0;
 
         /* ===== Card ===== */
         .card {
-            background: white;
+            background: var(--card-bg);
             border-radius: var(--border-radius);
             padding: 25px;
-            box-shadow: var(--card-shadow);
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--accent-color);
         }
 
         .card-header {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
             margin-bottom: 20px;
             padding-bottom: 15px;
-            border-bottom: 2px solid #eef2f7;
+            border-bottom: 2px solid #f1f5f9;
         }
 
         .card-header i {
-            color: var(--secondary);
-            font-size: 1.2rem;
+            color: var(--accent-color);
+            font-size: 1.3rem;
         }
 
         .card-header h2 {
             margin: 0;
-            font-size: 1.15rem;
-            color: var(--primary);
+            font-size: 1.2rem;
+            color: var(--primary-color);
             font-weight: 700;
         }
 
@@ -260,31 +311,32 @@ $total = $total_data['total'] ?? 0;
             margin-bottom: 6px;
             font-size: 0.85rem;
             font-weight: 600;
-            color: var(--text-dark);
+            color: var(--primary-color);
         }
 
         .form-group label i {
-            color: var(--secondary);
-            margin-right: 5px;
+            color: var(--accent-color);
+            margin-left: 6px;
             width: 16px;
         }
 
         .form-group input {
             width: 100%;
-            padding: 11px 14px;
-            border: 2px solid #e4e9f2;
+            padding: 12px 14px;
+            border: 2px solid #e2e8f0;
             border-radius: 10px;
             font-size: 0.95rem;
-            transition: all 0.25s ease;
+            transition: var(--transition);
             font-family: inherit;
-            background: #fafbfd;
+            background: var(--card-bg);
+            color: var(--text-color);
+            text-align: right;
         }
 
         .form-group input:focus {
             outline: none;
-            border-color: var(--secondary);
-            background: white;
-            box-shadow: 0 0 0 4px rgba(38, 208, 206, 0.12);
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(30, 60, 114, 0.1);
         }
 
         .btn {
@@ -298,56 +350,59 @@ $total = $total_data['total'] ?? 0;
             font-size: 0.95rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.25s ease;
+            transition: var(--transition);
             font-family: inherit;
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            background: var(--primary-color);
             color: white;
             width: 100%;
-            box-shadow: 0 4px 15px rgba(26, 41, 128, 0.25);
+            box-shadow: var(--shadow);
         }
 
         .btn-primary:hover {
+            background: var(--secondary-color);
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(26, 41, 128, 0.35);
+            box-shadow: 0 15px 30px rgba(30, 60, 114, 0.2);
         }
 
         .btn-secondary {
-            background: linear-gradient(135deg, var(--secondary), var(--accent));
-            color: var(--primary);
+            background: var(--accent-color);
+            color: var(--primary-color);
             width: 100%;
-            box-shadow: 0 4px 15px rgba(38, 208, 206, 0.25);
+            box-shadow: var(--shadow);
         }
 
         .btn-secondary:hover {
+            background: #d4a017;
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(38, 208, 206, 0.4);
+            box-shadow: 0 15px 30px rgba(230, 177, 46, 0.3);
         }
 
         /* ===== Alerts ===== */
         .alert {
-            padding: 12px 18px;
-            border-radius: 10px;
-            margin-bottom: 18px;
-            font-size: 0.9rem;
+            padding: 14px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
             font-weight: 600;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            animation: fadeIn 0.3s ease;
         }
 
         .alert-success {
-            background: #d4f5e2;
-            color: #1e7e4a;
-            border-left: 4px solid var(--success);
+            background-color: #dcfce7;
+            color: #166534;
+            border-right: 4px solid var(--success-color);
         }
 
         .alert-danger {
-            background: #fde2e2;
-            color: #b03030;
-            border-left: 4px solid var(--danger);
+            background-color: #fee2e2;
+            color: #991b1b;
+            border-right: 4px solid var(--danger-color);
         }
 
         /* ===== Filter Tabs ===== */
@@ -359,33 +414,33 @@ $total = $total_data['total'] ?? 0;
         }
 
         .filter-tabs a {
-            padding: 9px 16px;
+            padding: 9px 18px;
             border-radius: 25px;
             text-decoration: none;
             font-size: 0.85rem;
             font-weight: 600;
             color: var(--text-muted);
-            background: #eef2f7;
-            transition: all 0.25s ease;
+            background: #f1f5f9;
+            transition: var(--transition);
             border: 2px solid transparent;
         }
 
         .filter-tabs a:hover {
-            background: #e0e7f0;
-            color: var(--primary);
+            background: #e2e8f0;
+            color: var(--primary-color);
             transform: translateY(-2px);
         }
 
         .filter-tabs a.active {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            background: var(--primary-color);
             color: white;
-            box-shadow: 0 4px 12px rgba(26, 41, 128, 0.25);
+            box-shadow: 0 4px 12px rgba(30, 60, 114, 0.25);
         }
 
         /* ===== Custom Date Filter ===== */
         .custom-filter {
-            background: #f8fafd;
-            border: 2px dashed #d8e0ec;
+            background: #f8fafc;
+            border: 2px dashed #cbd5e1;
             border-radius: 12px;
             padding: 18px;
             margin-bottom: 20px;
@@ -406,14 +461,14 @@ $total = $total_data['total'] ?? 0;
 
         .custom-filter .btn {
             width: auto;
-            padding: 11px 22px;
+            padding: 12px 24px;
         }
 
         /* ===== Table ===== */
         .table-wrapper {
             overflow-x: auto;
             border-radius: 12px;
-            border: 1px solid #eef2f7;
+            border: 1px solid #e2e8f0;
         }
 
         table {
@@ -423,23 +478,22 @@ $total = $total_data['total'] ?? 0;
         }
 
         thead {
-            background: linear-gradient(135deg, var(--primary), var(--dark));
+            background: var(--primary-color);
         }
 
         th {
-            padding: 14px 16px;
-            text-align: left;
+            padding: 15px;
+            text-align: right;
             color: white;
             font-weight: 600;
-            font-size: 0.82rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 0.85rem;
         }
 
         td {
-            padding: 13px 16px;
-            border-bottom: 1px solid #eef2f7;
-            color: var(--text-dark);
+            padding: 14px 15px;
+            border-bottom: 1px solid #e2e8f0;
+            color: var(--text-color);
+            text-align: right;
         }
 
         tbody tr {
@@ -447,7 +501,7 @@ $total = $total_data['total'] ?? 0;
         }
 
         tbody tr:hover {
-            background: #f8fafd;
+            background: #f8fafc;
         }
 
         tbody tr:last-child td {
@@ -456,12 +510,12 @@ $total = $total_data['total'] ?? 0;
 
         .amount-cell {
             font-weight: 700;
-            color: var(--primary);
+            color: var(--primary-color);
         }
 
         .id-badge {
             display: inline-block;
-            background: #eef2f7;
+            background: #f1f5f9;
             color: var(--text-muted);
             padding: 3px 10px;
             border-radius: 12px;
@@ -477,7 +531,7 @@ $total = $total_data['total'] ?? 0;
 
         .empty-state i {
             font-size: 2.5rem;
-            color: #d8e0ec;
+            color: #cbd5e1;
             margin-bottom: 12px;
             display: block;
         }
@@ -486,13 +540,13 @@ $total = $total_data['total'] ?? 0;
         .total-footer {
             margin-top: 20px;
             padding: 18px 24px;
-            background: linear-gradient(135deg, var(--primary), var(--dark));
+            background: var(--primary-color);
             border-radius: var(--border-radius);
             display: flex;
             align-items: center;
             justify-content: space-between;
             color: white;
-            box-shadow: 0 6px 20px rgba(26, 41, 128, 0.25);
+            box-shadow: 0 6px 20px rgba(30, 60, 114, 0.2);
         }
 
         .total-footer .total-label {
@@ -501,26 +555,27 @@ $total = $total_data['total'] ?? 0;
             gap: 10px;
             font-size: 1rem;
             font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
         }
 
         .total-footer .total-label i {
-            color: var(--accent);
+            color: var(--accent-color);
             font-size: 1.3rem;
         }
 
         .total-footer .total-value {
             font-size: 1.6rem;
             font-weight: 800;
-            color: var(--accent);
+            color: var(--accent-color);
+        }
+
+        /* ===== Animation ===== */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         /* ===== Responsive ===== */
         @media (max-width: 768px) {
-            body {
-                padding: 80px 18px 30px;
-            }
             .page-header h1 {
                 font-size: 1.4rem;
             }
@@ -538,6 +593,23 @@ $total = $total_data['total'] ?? 0;
                 width: 100%;
             }
         }
+
+        @media (max-width: 480px) {
+            .page-header h1 {
+                font-size: 1.3rem;
+            }
+            .stat-card {
+                padding: 18px 16px;
+            }
+            .stat-icon {
+                width: 50px;
+                height: 50px;
+                font-size: 1.3rem;
+            }
+            .stat-info p {
+                font-size: 1.1rem;
+            }
+        }
     </style>
 </head>
 
@@ -545,202 +617,194 @@ $total = $total_data['total'] ?? 0;
 
 <?php include 'sidebar.php'; ?>
 
-<!-- ===== Page Header ===== -->
-<div class="page-header">
-    <div>
-        <h1><i class="fas fa-wallet"></i> Expenses</h1>
-        <div class="subtitle">Track and manage all pharmacy expenses</div>
-    </div>
-</div>
+<div class="main-content">
 
-<!-- ===== Alerts ===== -->
-<?php if (!empty($success_msg)): ?>
-    <div class="alert alert-success">
-        <i class="fas fa-check-circle"></i> <?php echo htmlspecialchars($success_msg); ?>
-    </div>
-<?php endif; ?>
-
-<?php if (!empty($error_msg)): ?>
-    <div class="alert alert-danger">
-        <i class="fas fa-exclamation-circle"></i> <?php echo htmlspecialchars($error_msg); ?>
-    </div>
-<?php endif; ?>
-
-<!-- ===== Stats Cards ===== -->
-<?php
-$count_sql = "SELECT COUNT(*) AS cnt FROM expenses $where";
-$count_result = mysqli_query($conn, $count_sql);
-$count_data = mysqli_fetch_assoc($count_result);
-$expense_count = $count_data['cnt'] ?? 0;
-
-$today_sql = "SELECT SUM(amount) AS today_total FROM expenses WHERE expense_date = CURDATE()";
-$today_result = mysqli_query($conn, $today_sql);
-$today_data = mysqli_fetch_assoc($today_result);
-$today_total = $today_data['today_total'] ?? 0;
-?>
-
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-icon total">
-            <i class="fas fa-coins"></i>
-        </div>
-        <div class="stat-info">
-            <h3>Total Expenses</h3>
-            <p><?php echo number_format($total, 2); ?></p>
+    <!-- ===== Page Header ===== -->
+    <div class="page-header">
+        <div>
+            <h1><i class="fas fa-wallet"></i> لګښتونه</h1>
+            <div class="subtitle">د قرطاسیه ټول لګښتونه تعقیب او مدیریت کړئ</div>
         </div>
     </div>
 
-    <div class="stat-card">
-        <div class="stat-icon count">
-            <i class="fas fa-receipt"></i>
+    <!-- ===== Alerts ===== -->
+    <?php if (!empty($success_msg)): ?>
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> <?php echo htmlspecialchars($success_msg); ?>
         </div>
-        <div class="stat-info">
-            <h3>Records</h3>
-            <p><?php echo $expense_count; ?></p>
+    <?php endif; ?>
+
+    <?php if (!empty($error_msg)): ?>
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-circle"></i> <?php echo htmlspecialchars($error_msg); ?>
+        </div>
+    <?php endif; ?>
+
+    <!-- ===== Stats Cards ===== -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon total">
+                <i class="fas fa-coins"></i>
+            </div>
+            <div class="stat-info">
+                <h3>ټول لګښتونه</h3>
+                <p><?php echo number_format($total, 2); ?></p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon count">
+                <i class="fas fa-receipt"></i>
+            </div>
+            <div class="stat-info">
+                <h3>ریکارډونه</h3>
+                <p><?php echo $expense_count; ?></p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon today">
+                <i class="fas fa-calendar-day"></i>
+            </div>
+            <div class="stat-info">
+                <h3>نن</h3>
+                <p><?php echo number_format($today_total, 2); ?></p>
+            </div>
         </div>
     </div>
 
-    <div class="stat-card">
-        <div class="stat-icon today">
-            <i class="fas fa-calendar-day"></i>
-        </div>
-        <div class="stat-info">
-            <h3>Today</h3>
-            <p><?php echo number_format($today_total, 2); ?></p>
-        </div>
-    </div>
-</div>
+    <!-- ===== Content Grid ===== -->
+    <div class="content-grid">
 
-<!-- ===== Content Grid ===== -->
-<div class="content-grid">
-
-    <!-- ===== Add Expense Form ===== -->
-    <div class="card">
-        <div class="card-header">
-            <i class="fas fa-plus-circle"></i>
-            <h2>Add New Expense</h2>
-        </div>
-
-        <form method="POST">
-            <div class="form-group">
-                <label><i class="fas fa-dollar-sign"></i> Amount</label>
-                <input type="number" name="amount" step="0.01" placeholder="0.00" required>
+        <!-- ===== Add Expense Form ===== -->
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-plus-circle"></i>
+                <h2>نوی لګښت اضافه کړئ</h2>
             </div>
 
-            <div class="form-group">
-                <label><i class="fas fa-tag"></i> Used For</label>
-                <input type="text" name="used_for" placeholder="Example: Food" required>
-            </div>
-
-            <div class="form-group">
-                <label><i class="fas fa-user"></i> Person</label>
-                <input type="text" name="person" placeholder="Example: Ahmad" required>
-            </div>
-
-            <div class="form-group">
-                <label><i class="fas fa-calendar"></i> Date</label>
-                <input type="date" name="expense_date" required>
-            </div>
-
-            <button type="submit" name="add_expense" class="btn btn-primary">
-                <i class="fas fa-save"></i> Add Expense
-            </button>
-        </form>
-    </div>
-
-    <!-- ===== Expenses List ===== -->
-    <div class="card">
-        <div class="card-header">
-            <i class="fas fa-list"></i>
-            <h2>Expense Records</h2>
-        </div>
-
-        <!-- Filter Tabs -->
-        <div class="filter-tabs">
-            <a href="expenses.php?filter=all" class="<?php echo $filter == 'all' ? 'active' : ''; ?>">
-                <i class="fas fa-list"></i> All
-            </a>
-            <a href="expenses.php?filter=today" class="<?php echo $filter == 'today' ? 'active' : ''; ?>">
-                <i class="fas fa-calendar-day"></i> Today
-            </a>
-            <a href="expenses.php?filter=yesterday" class="<?php echo $filter == 'yesterday' ? 'active' : ''; ?>">
-                <i class="fas fa-calendar-minus"></i> Yesterday
-            </a>
-            <a href="expenses.php?filter=week" class="<?php echo $filter == 'week' ? 'active' : ''; ?>">
-                <i class="fas fa-calendar-week"></i> This Week
-            </a>
-            <a href="expenses.php?filter=month" class="<?php echo $filter == 'month' ? 'active' : ''; ?>">
-                <i class="fas fa-calendar-alt"></i> This Month
-            </a>
-        </div>
-
-        <!-- Custom Date Filter -->
-        <div class="custom-filter">
-            <form method="GET">
-                <input type="hidden" name="filter" value="custom">
-                <div class="custom-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-calendar-plus"></i> From Date</label>
-                        <input type="date" name="from_date" required>
-                    </div>
-                    <div class="form-group">
-                        <label><i class="fas fa-calendar-check"></i> To Date</label>
-                        <input type="date" name="to_date" required>
-                    </div>
-                    <button type="submit" class="btn btn-secondary">
-                        <i class="fas fa-filter"></i> Filter
-                    </button>
+            <form method="POST">
+                <div class="form-group">
+                    <label><i class="fas fa-dollar-sign"></i> اندازه</label>
+                    <input type="number" name="amount" step="0.01" placeholder="0.00" required>
                 </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-tag"></i> د څه لپاره</label>
+                    <input type="text" name="used_for" placeholder="مثال: خواړه" required>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-user"></i> کس</label>
+                    <input type="text" name="person" placeholder="مثال: احمد" required>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-calendar"></i> نېټه</label>
+                    <input type="date" name="expense_date" required>
+                </div>
+
+                <button type="submit" name="add_expense" class="btn btn-primary">
+                    <i class="fas fa-save"></i> لګښت اضافه کړئ
+                </button>
             </form>
         </div>
 
-        <!-- Table -->
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Amount</th>
-                        <th>Used For</th>
-                        <th>Person</th>
-                        <th>Date</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (mysqli_num_rows($result) > 0): ?>
-                        <?php while ($row = mysqli_fetch_assoc($result)): ?>
-                            <tr>
-                                <td><span class="id-badge">#<?php echo $row['id']; ?></span></td>
-                                <td class="amount-cell"><?php echo number_format($row['amount'], 2); ?></td>
-                                <td><?php echo htmlspecialchars($row['used_for']); ?></td>
-                                <td><?php echo htmlspecialchars($row['person']); ?></td>
-                                <td><?php echo htmlspecialchars($row['expense_date']); ?></td>
-                            </tr>
-                        <?php endwhile; ?>
-                    <?php else: ?>
+        <!-- ===== Expenses List ===== -->
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-list"></i>
+                <h2>د لګښتونو ریکارډونه</h2>
+            </div>
+
+            <!-- Filter Tabs -->
+            <div class="filter-tabs">
+                <a href="expenses.php?filter=all" class="<?php echo $filter == 'all' ? 'active' : ''; ?>">
+                    <i class="fas fa-list"></i> ټول
+                </a>
+                <a href="expenses.php?filter=today" class="<?php echo $filter == 'today' ? 'active' : ''; ?>">
+                    <i class="fas fa-calendar-day"></i> نن
+                </a>
+                <a href="expenses.php?filter=yesterday" class="<?php echo $filter == 'yesterday' ? 'active' : ''; ?>">
+                    <i class="fas fa-calendar-minus"></i> پرون
+                </a>
+                <a href="expenses.php?filter=week" class="<?php echo $filter == 'week' ? 'active' : ''; ?>">
+                    <i class="fas fa-calendar-week"></i> دې اونۍ
+                </a>
+                <a href="expenses.php?filter=month" class="<?php echo $filter == 'month' ? 'active' : ''; ?>">
+                    <i class="fas fa-calendar-alt"></i> دې میاشت
+                </a>
+            </div>
+
+            <!-- Custom Date Filter -->
+            <div class="custom-filter">
+                <form method="GET">
+                    <input type="hidden" name="filter" value="custom">
+                    <div class="custom-row">
+                        <div class="form-group">
+                            <label><i class="fas fa-calendar-plus"></i> له نېټې</label>
+                            <input type="date" name="from_date" required>
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fas fa-calendar-check"></i> تر نېټې</label>
+                            <input type="date" name="to_date" required>
+                        </div>
+                        <button type="submit" class="btn btn-secondary">
+                            <i class="fas fa-filter"></i> فلټر
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Table -->
+            <div class="table-wrapper">
+                <table>
+                    <thead>
                         <tr>
-                            <td colspan="5">
-                                <div class="empty-state">
-                                    <i class="fas fa-inbox"></i>
-                                    No expenses found for this filter.
-                                </div>
-                            </td>
+                            <th>ID</th>
+                            <th>اندازه</th>
+                            <th>د څه لپاره</th>
+                            <th>کس</th>
+                            <th>نېټه</th>
                         </tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <?php if (mysqli_num_rows($result) > 0): ?>
+                            <?php while ($row = mysqli_fetch_assoc($result)): ?>
+                                <tr>
+                                    <td><span class="id-badge">#<?php echo $row['id']; ?></span></td>
+                                    <td class="amount-cell"><?php echo number_format($row['amount'], 2); ?></td>
+                                    <td><?php echo htmlspecialchars($row['used_for']); ?></td>
+                                    <td><?php echo htmlspecialchars($row['person']); ?></td>
+                                    <td><?php echo htmlspecialchars($row['expense_date']); ?></td>
+                                </tr>
+                            <?php endwhile; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="5">
+                                    <div class="empty-state">
+                                        <i class="fas fa-inbox"></i>
+                                        د دې فلټر لپاره هیڅ لګښت ونه موندل شو.
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Total Footer -->
+            <div class="total-footer">
+                <div class="total-label">
+                    <i class="fas fa-calculator"></i>
+                    ټول لګښتونه
+                </div>
+                <div class="total-value">
+                    <?php echo number_format($total, 2); ?>
+                </div>
+            </div>
         </div>
 
-        <!-- Total Footer -->
-        <div class="total-footer">
-            <div class="total-label">
-                <i class="fas fa-calculator"></i>
-                Total Expenses
-            </div>
-            <div class="total-value">
-                <?php echo number_format($total, 2); ?>
-            </div>
-        </div>
     </div>
 
 </div>
