@@ -3,6 +3,20 @@
 include "db.php";
 
 // =========================
+// DELETE EXPENSE
+// =========================
+
+if (isset($_GET['delete_id'])) {
+    $delete_id = intval($_GET['delete_id']);
+    $delete_sql = "DELETE FROM expenses WHERE id = $delete_id";
+    if (mysqli_query($conn, $delete_sql)) {
+        $success_msg = "لګښت په بریالیتوب سره ړنګ شو!";
+    } else {
+        $error_msg = "تېروتنه: " . mysqli_error($conn);
+    }
+}
+
+// =========================
 // ADD EXPENSE
 // =========================
 
@@ -576,6 +590,27 @@ $today_date = date('Y-m-d');
             color: var(--accent-color);
         }
 
+        /* ===== Delete Button ===== */
+        .btn-delete {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            background: var(--danger-color);
+            color: white;
+            text-decoration: none;
+            transition: var(--transition);
+            font-size: 0.85rem;
+        }
+
+        .btn-delete:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(239, 68, 68, 0.4);
+        }
+
         /* ===== Animation ===== */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(15px); }
@@ -775,6 +810,7 @@ $today_date = date('Y-m-d');
                             <th>د څه لپاره</th>
                             <th>کس</th>
                             <th>نېټه</th>
+                            <th>کړنې</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -786,11 +822,20 @@ $today_date = date('Y-m-d');
                                     <td><?php echo htmlspecialchars($row['used_for']); ?></td>
                                     <td><?php echo htmlspecialchars($row['person']); ?></td>
                                     <td><?php echo htmlspecialchars($row['expense_date']); ?></td>
+                                    <td>
+                                        <!-- ✅ Delete button -->
+                                        <a href="?delete_id=<?php echo $row['id']; ?>" 
+                                           class="btn-delete" 
+                                           title="ړنګول"
+                                           onclick="return confirm('ایا تاسو ډاډه یاست چې دا لګښت ړنګ کړئ؟');">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </td>
                                 </tr>
                             <?php endwhile; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="5">
+                                <td colspan="6">
                                     <div class="empty-state">
                                         <i class="fas fa-inbox"></i>
                                         د دې فلټر لپاره هیڅ لګښت ونه موندل شو.
