@@ -1,0 +1,302 @@
+[2026-10-10 10:07:02] === PAGE LOAD ===
+[2026-10-10 10:07:02] REQUEST_METHOD => POST
+[2026-10-10 10:07:02] POST keys => Array
+(
+    [0] => full_name
+    [1] => phone
+    [2] => address
+    [3] => province
+    [4] => note
+)
+
+[2026-10-10 10:07:02] GET keys
+[2026-10-10 10:07:02] FILES => Array
+(
+    [picture] => Array
+        (
+            [name] => qabuli.png
+            [full_path] => qabuli.png
+            [type] => image/png
+            [tmp_name] => C:\xampp\tmp\phpFFFE.tmp
+            [error] => 0
+            [size] => 2966237
+        )
+
+)
+
+[2026-10-10 10:07:02] TABLE STRUCTURE => 
+id | int(11) | Null: NO | Default: NULL
+full_name | varchar(150) | Null: NO | Default: NULL
+picture | varchar(255) | Null: YES | Default: NULL
+phone | varchar(30) | Null: YES | Default: NULL
+address | text | Null: YES | Default: NULL
+province | varchar(100) | Null: YES | Default: NULL
+note | text | Null: YES | Default: NULL
+created_at | timestamp | Null: NO | Default: current_timestamp()
+[2026-10-10 10:07:23] === PAGE LOAD ===
+[2026-10-10 10:07:23] REQUEST_METHOD => POST
+[2026-10-10 10:07:23] POST keys => Array
+(
+    [0] => full_name
+    [1] => phone
+    [2] => address
+    [3] => province
+    [4] => note
+)
+
+[2026-10-10 10:07:23] GET keys
+[2026-10-10 10:07:23] FILES => Array
+(
+    [picture] => Array
+        (
+            [name] => qabuli.png
+            [full_path] => qabuli.png
+            [type] => image/png
+            [tmp_name] => C:\xampp\tmp\php52E1.tmp
+            [error] => 0
+            [size] => 2966237
+        )
+
+)
+
+[2026-10-10 10:07:23] TABLE STRUCTURE => 
+id | int(11) | Null: NO | Default: NULL
+full_name | varchar(150) | Null: NO | Default: NULL
+picture | varchar(255) | Null: YES | Default: NULL
+phone | varchar(30) | Null: YES | Default: NULL
+address | text | Null: YES | Default: NULL
+province | varchar(100) | Null: YES | Default: NULL
+note | text | Null: YES | Default: NULL
+created_at | timestamp | Null: NO | Default: current_timestamp()
+[2026-10-10 10:09:04] === PAGE LOAD ===
+[2026-10-10 10:09:04] REQUEST_METHOD => POST
+[2026-10-10 10:09:04] POST keys => Array
+(
+    [0] => full_name
+    [1] => phone
+    [2] => address
+    [3] => province
+    [4] => note
+)
+
+[2026-10-10 10:09:04] GET keys
+[2026-10-10 10:09:04] FILES => Array
+(
+    [picture] => Array
+        (
+            [name] => qabuli.png
+            [full_path] => qabuli.png
+            [type] => image/png
+            [tmp_name] => C:\xampp\tmp\phpDF01.tmp
+            [error] => 0
+            [size] => 2966237
+        )
+
+)
+
+[2026-10-10 10:09:04] TABLE STRUCTURE => 
+id | int(11) | Null: NO | Default: NULL
+full_name | varchar(150) | Null: NO | Default: NULL
+picture | varchar(255) | Null: YES | Default: NULL
+phone | varchar(30) | Null: YES | Default: NULL
+address | text | Null: YES | Default: NULL
+province | varchar(100) | Null: YES | Default: NULL
+note | text | Null: YES | Default: NULL
+created_at | timestamp | Null: NO | Default: current_timestamp()
+[2026-10-10 10:09:09] === PAGE LOAD ===
+[2026-10-10 10:09:09] REQUEST_METHOD => POST
+[2026-10-10 10:09:09] POST keys => Array
+(
+    [0] => full_name
+    [1] => phone
+    [2] => address
+    [3] => province
+    [4] => note
+)
+
+[2026-10-10 10:09:09] GET keys
+[2026-10-10 10:09:09] FILES => Array
+(
+    [picture] => Array
+        (
+            [name] => qabuli.png
+            [full_path] => qabuli.png
+            [type] => image/png
+            [tmp_name] => C:\xampp\tmp\phpF27A.tmp
+            [error] => 0
+            [size] => 2966237
+        )
+
+)
+
+[2026-10-10 10:09:09] TABLE STRUCTURE => 
+id | int(11) | Null: NO | Default: NULL
+full_name | varchar(150) | Null: NO | Default: NULL
+picture | varchar(255) | Null: YES | Default: NULL
+phone | varchar(30) | Null: YES | Default: NULL
+address | text | Null: YES | Default: NULL
+province | varchar(100) | Null: YES | Default: NULL
+note | text | Null: YES | Default: NULL
+created_at | timestamp | Null: NO | Default: current_timestamp()
+[2026-10-10 10:09:20] === PAGE LOAD ===
+[2026-10-10 10:09:20] REQUEST_METHOD => POST
+[2026-10-10 10:09:20] POST keys => Array
+(
+    [0] => add_client
+    [1] => full_name
+    [2] => phone
+    [3] => address
+    [4] => province
+    [5] => note
+)
+
+[2026-10-10 10:09:20] GET keys
+[2026-10-10 10:09:20] FILES => Array
+(
+    [picture] => Array
+        (
+            [name] => ali.png
+            [full_path] => ali.png
+            [type] => image/png
+            [tmp_name] => C:\xampp\tmp\php1C5A.tmp
+            [error] => 0
+            [size] => 1774990
+        )
+
+)
+
+[2026-10-10 10:09:20] === ADD CLIENT START ===
+[2026-10-10 10:09:20] POST data => Array
+(
+    [add_client] => 1
+    [full_name] => بب
+    [phone] => 432432
+    [address] => fdsafd
+    [province] => fds
+    [note] => fdsa
+)
+
+[2026-10-10 10:09:20] Parsed values => Array
+(
+    [full_name] => بب
+    [phone] => 432432
+    [address] => fdsafd
+    [province] => fds
+    [note] => fdsa
+)
+
+[2026-10-10 10:09:20] PICTURE UPLOAD => Array
+(
+    [name] => ali.png
+    [full_path] => ali.png
+    [type] => image/png
+    [tmp_name] => C:\xampp\tmp\php1C5A.tmp
+    [error] => 0
+    [size] => 1774990
+)
+
+[2026-10-10 10:09:20] Picture extension => png
+[2026-10-10 10:09:20] Target path => C:\xampp\htdocs\shop/uploads/clients/client_1791619760_85ffebea.png
+[2026-10-10 10:09:20] Picture uploaded successfully => uploads/clients/client_1791619760_85ffebea.png
+[2026-10-10 10:09:20] === ATTEMPTING INSERT ===
+[2026-10-10 10:09:20] SQL Query => INSERT INTO clients (full_name, picture, phone, address, province, note) VALUES (?, ?, ?, ?, ?, ?)
+[2026-10-10 10:09:20] Statement prepared OK
+[2026-10-10 10:09:20] bind_param result => 1
+[2026-10-10 10:09:20] Params bound OK
+[2026-10-10 10:09:20] execute result => 1
+[2026-10-10 10:09:20] INSERT SUCCESS - ID => 3
+[2026-10-10 10:09:20] === ADD CLIENT END - redirecting ===
+[2026-10-10 10:09:20] === PAGE LOAD ===
+[2026-10-10 10:09:20] REQUEST_METHOD => GET
+[2026-10-10 10:09:20] POST keys
+[2026-10-10 10:09:20] GET keys
+[2026-10-10 10:09:20] TABLE STRUCTURE => 
+id | int(11) | Null: NO | Default: NULL
+full_name | varchar(150) | Null: NO | Default: NULL
+picture | varchar(255) | Null: YES | Default: NULL
+phone | varchar(30) | Null: YES | Default: NULL
+address | text | Null: YES | Default: NULL
+province | varchar(100) | Null: YES | Default: NULL
+note | text | Null: YES | Default: NULL
+created_at | timestamp | Null: NO | Default: current_timestamp()
+[2026-10-10 10:09:35] === PAGE LOAD ===
+[2026-10-10 10:09:35] REQUEST_METHOD => POST
+[2026-10-10 10:09:35] POST keys => Array
+(
+    [0] => add_client
+    [1] => full_name
+    [2] => phone
+    [3] => address
+    [4] => province
+    [5] => note
+)
+
+[2026-10-10 10:09:35] GET keys
+[2026-10-10 10:09:35] FILES => Array
+(
+    [picture] => Array
+        (
+            [name] => ali.png
+            [full_path] => ali.png
+            [type] => image/png
+            [tmp_name] => C:\xampp\tmp\php5628.tmp
+            [error] => 0
+            [size] => 1774990
+        )
+
+)
+
+[2026-10-10 10:09:35] === ADD CLIENT START ===
+[2026-10-10 10:09:35] POST data => Array
+(
+    [add_client] => 1
+    [full_name] => بب
+    [phone] => 7398428
+    [address] => fdsa
+    [province] => fdsa
+    [note] => fdsa
+)
+
+[2026-10-10 10:09:35] Parsed values => Array
+(
+    [full_name] => بب
+    [phone] => 7398428
+    [address] => fdsa
+    [province] => fdsa
+    [note] => fdsa
+)
+
+[2026-10-10 10:09:35] PICTURE UPLOAD => Array
+(
+    [name] => ali.png
+    [full_path] => ali.png
+    [type] => image/png
+    [tmp_name] => C:\xampp\tmp\php5628.tmp
+    [error] => 0
+    [size] => 1774990
+)
+
+[2026-10-10 10:09:35] Picture extension => png
+[2026-10-10 10:09:35] Target path => C:\xampp\htdocs\shop/uploads/clients/client_1791619775_98c12e9e.png
+[2026-10-10 10:09:35] Picture uploaded successfully => uploads/clients/client_1791619775_98c12e9e.png
+[2026-10-10 10:09:35] === ATTEMPTING INSERT ===
+[2026-10-10 10:09:35] SQL Query => INSERT INTO clients (full_name, picture, phone, address, province, note) VALUES (?, ?, ?, ?, ?, ?)
+[2026-10-10 10:09:35] Statement prepared OK
+[2026-10-10 10:09:35] bind_param result => 1
+[2026-10-10 10:09:35] Params bound OK
+[2026-10-10 10:09:35] execute result => 1
+[2026-10-10 10:09:35] INSERT SUCCESS - ID => 4
+[2026-10-10 10:09:35] === ADD CLIENT END - redirecting ===
+[2026-10-10 10:09:35] === PAGE LOAD ===
+[2026-10-10 10:09:35] REQUEST_METHOD => GET
+[2026-10-10 10:09:35] POST keys
+[2026-10-10 10:09:35] GET keys
+[2026-10-10 10:09:35] TABLE STRUCTURE => 
+id | int(11) | Null: NO | Default: NULL
+full_name | varchar(150) | Null: NO | Default: NULL
+picture | varchar(255) | Null: YES | Default: NULL
+phone | varchar(30) | Null: YES | Default: NULL
+address | text | Null: YES | Default: NULL
+province | varchar(100) | Null: YES | Default: NULL
+note | text | Null: YES | Default: NULL
+created_at | timestamp | Null: NO | Default: current_timestamp()
