@@ -84,6 +84,9 @@ $today_result = mysqli_query($conn, $today_sql);
 $today_data = mysqli_fetch_assoc($today_result);
 $today_total = $today_data['today_total'] ?? 0;
 
+// Today's date in Y-m-d format for the date input default value
+$today_date = date('Y-m-d');
+
 ?>
 
 <!DOCTYPE html>
@@ -129,18 +132,17 @@ $today_total = $today_data['today_total'] ?? 0;
             min-height: 100vh;
             font-size: 14px;
             line-height: 1.6;
-                        margin-top: -50px;
-
         }
 
         /* ===== Main Content ===== */
         .main-content {
-            padding: 20px;
+            padding: 5px;
         }
 
         @media (max-width: 768px) {
             .main-content {
-               
+                padding: 5px;
+                padding-top: 5px;
             }
         }
 
@@ -337,6 +339,12 @@ $today_total = $today_data['today_total'] ?? 0;
             outline: none;
             border-color: var(--primary-color);
             box-shadow: 0 0 0 4px rgba(30, 60, 114, 0.1);
+        }
+
+        /* Highlight today's date field */
+        .form-group input[type="date"] {
+            direction: ltr;
+            text-align: right;
         }
 
         .btn {
@@ -701,7 +709,8 @@ $today_total = $today_data['today_total'] ?? 0;
 
                 <div class="form-group">
                     <label><i class="fas fa-calendar"></i> نېټه</label>
-                    <input type="date" name="expense_date" required>
+                    <!-- ✅ Default value set to today's date -->
+                    <input type="date" name="expense_date" value="<?php echo $today_date; ?>" required>
                 </div>
 
                 <button type="submit" name="add_expense" class="btn btn-primary">
