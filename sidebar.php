@@ -420,11 +420,15 @@ $is_admin = ($current_user === 'admin');
             <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'dashboard.php' ? 'active' : ''; ?>">
                 <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i> ډشبورډ</a>
             </li>
-            <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'products.php' ? 'active' : ''; ?>">
-                <a href="products.php"><i class="fas fa-boxes"></i> توکي اضافه کړئ</a>
+             <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'client.php' ? 'active' : ''; ?>">
+                <a href="client.php"><i class="fas fa-users"></i> مشتریان</a>
             </li>
-            <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'save.php' ? 'active' : ''; ?>">
-                <a href="save.php"><i class="fas fa-cash-register"></i> پلور</a>
+            <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'pay.php' ? 'active' : ''; ?>">
+                <a href="pay.php"><i class="fas fa-boxes"></i> قرض اضافه کړئ</a>
+            </li>
+             
+            <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'sale.php' ? 'active' : ''; ?>">
+                <a href="sale.php"><i class="fas fa-cash-register"></i> پلور</a>
             </li>
             <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'register.php' ? 'active' : ''; ?>">
                 <a href="register.php"><i class="fas fa-users"></i> کاروونکي</a>
@@ -432,10 +436,8 @@ $is_admin = ($current_user === 'admin');
             <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'expenses.php' ? 'active' : ''; ?>">
                 <a href="expenses.php"><i class="fas fa-wallet"></i> لګښتونه</a>
             </li>
-            <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'item.php' ? 'active' : ''; ?>">
-                <a href="item.php"><i class="fas fa-warehouse"></i> ګدام</a>
-            </li>
-            <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'companies.php' ? 'active' : ''; ?>">
+          
+            <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'sarafe.php' ? 'active' : ''; ?>">
                 <a href="sarafe.php"><i class="fas fa-building"></i> صراف پیسی</a>
             </li>
             <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'backup_manager.php' ? 'active' : ''; ?>">

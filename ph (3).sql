@@ -24,9 +24,6 @@ SET time_zone = "+00:00";
 -- --------------------------------------------------------
 
 --
--- Table structure for table `customer_unpaid`
---
-
 CREATE TABLE `customer_unpaid` (
   `unpaid_id` int(11) NOT NULL,
   `sale_id` int(11) NOT NULL,
