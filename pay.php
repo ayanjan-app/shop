@@ -482,11 +482,11 @@ $today_date = date('Y-m-d');
         .search-row .form-group { flex: 1; min-width: 160px; margin-bottom: 0; }
         .search-row .btn { width: auto; padding: 12px 24px; }
 
-        /* ===== TABLE WITH HORIZONTAL SCROLL ===== */
+        /* ===== BALANCE SUMMARY TABLE: 300px height with scroll ===== */
         .table-scroll {
             overflow-x: auto;
             overflow-y: auto;
-            max-height: 600px;
+            max-height: 300px;
             border-radius: 12px;
             border: 1px solid #e2e8f0;
             background: #ffffff;
@@ -508,12 +508,64 @@ $today_date = date('Y-m-d');
             background: #d4a017;
         }
 
-        /* ===== BALANCE TABLE (the summary at the top) ===== */
+        /* ===== SUMMARY SEARCH BAR ===== */
+        .summary-search-bar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .summary-search-bar .search-input-wrap {
+            flex: 1;
+            min-width: 240px;
+            position: relative;
+        }
+        .summary-search-bar .search-input-wrap i {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--accent-color);
+            font-size: 0.95rem;
+            pointer-events: none;
+        }
+        .summary-search-bar input[type="text"] {
+            width: 100%;
+            padding: 12px 42px 12px 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            background: #ffffff;
+            transition: var(--transition);
+            text-align: right;
+        }
+        .summary-search-bar input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(30,60,114,0.1);
+        }
+        .summary-search-bar .filter-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background: #eff6ff;
+            color: #1e40af;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: 1px solid #bfdbfe;
+            white-space: nowrap;
+        }
+
+        /* ===== BALANCE TABLE ===== */
         .balance-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.88rem;
-            min-width: 1000px; /* forces horizontal scroll */
+            min-width: 1000px;
         }
         .balance-table thead th {
             position: sticky;
@@ -532,11 +584,9 @@ $today_date = date('Y-m-d');
             background: #0f2a52;
             text-align: right;
         }
-        /* AFN side (right side in RTL = first columns) */
         .balance-table thead th.afn-header {
             background: #991b1b;
         }
-        /* USD side (left side in RTL = last columns) */
         .balance-table thead th.usd-header {
             background: #166534;
         }
@@ -806,8 +856,24 @@ $today_date = date('Y-m-d');
             </span>
         </div>
 
+        <!-- ✅ Search bar for filtering clients by name -->
+        <div class="summary-search-bar">
+            <div class="search-input-wrap">
+                <i class="fas fa-search"></i>
+                <input type="text" 
+                       id="clientSearchInput" 
+                       placeholder="د پیرودونکي نوم ولیکئ د پلټنې لپاره..."
+                       oninput="filterClientRows()">
+            </div>
+            <span class="filter-info">
+                <i class="fas fa-users"></i>
+                <span id="visibleCount"><?php echo count($clients_balances); ?></span> پیرودونکي
+            </span>
+        </div>
+
+        <!-- ✅ 300px height with vertical scroll -->
         <div class="table-scroll">
-            <table class="balance-table">
+            <table class="balance-table" id="balanceTable">
                 <thead>
                     <tr>
                         <!-- AFN side (Right in RTL) -->
@@ -821,12 +887,13 @@ $today_date = date('Y-m-d');
                         <th class="usd-header">پاتې ډالر</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="balanceTableBody">
                     <?php if (count($clients_balances) > 0): ?>
                         <?php foreach ($clients_balances as $cb): 
                             $has_unpaid = ($cb['usd_unpaid'] > 0.01) || ($cb['afn_unpaid'] > 0.01);
                         ?>
-                            <tr class="<?php echo $has_unpaid ? 'row-has-unpaid' : ''; ?>">
+                            <tr class="client-row <?php echo $has_unpaid ? 'row-has-unpaid' : ''; ?>"
+                                data-client-name="<?php echo htmlspecialchars(mb_strtolower($cb['full_name'], 'UTF-8')); ?>">
                                 <td class="client-name-cell"><?php echo htmlspecialchars($cb['full_name']); ?></td>
 
                                 <!-- AFN -->
@@ -1276,7 +1343,26 @@ $today_date = date('Y-m-d');
             fetchBalance();
         });
     }
+
+    // ===== SEARCH IN CLIENT BALANCES TABLE =====
+    function filterClientRows() {
+        const searchValue = document.getElementById('clientSearchInput').value.toLowerCase().trim();
+        const rows = document.querySelectorAll('#balanceTableBody tr.client-row');
+        let visibleCount = 0;
+
+        rows.forEach(row => {
+            const name = row.getAttribute('data-client-name') || '';
+            if (searchValue === '' || name.includes(searchValue)) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        document.getElementById('visibleCount').textContent = visibleCount;
+    }
 </script>
 
 </body>
-</html>
+</html>s

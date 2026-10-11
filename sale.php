@@ -26,6 +26,54 @@ if (isset($_SESSION['flash_error'])) {
 }
 
 // =========================
+// AJAX: GET CLIENT BALANCE FOR SALES PAGE
+// =========================
+if (isset($_GET['ajax_client_balance'])) {
+    header('Content-Type: application/json');
+
+    $client_id = intval($_GET['client_id'] ?? 0);
+    $currency  = trim($_GET['currency'] ?? '');
+
+    if ($client_id <= 0 || !in_array($currency, ['USD', 'AFN'])) {
+        echo json_encode(['success' => false, 'message' => 'Invalid parameters']);
+        exit();
+    }
+
+    // Total invoiced
+    $invStmt = $conn->prepare("SELECT COALESCE(SUM(total_amount), 0) AS total FROM sales WHERE client_id = ? AND currency = ?");
+    $invStmt->bind_param("is", $client_id, $currency);
+    $invStmt->execute();
+    $invoice_total = $invStmt->get_result()->fetch_assoc()['total'] ?? 0;
+    $invStmt->close();
+
+    // Total paid
+    $payStmt = $conn->prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM client_payments WHERE client_id = ? AND currency = ?");
+    $payStmt->bind_param("is", $client_id, $currency);
+    $payStmt->execute();
+    $paid_total = $payStmt->get_result()->fetch_assoc()['total'] ?? 0;
+    $payStmt->close();
+
+    $unpaid = $invoice_total - $paid_total;
+
+    // Client name
+    $nameStmt = $conn->prepare("SELECT full_name FROM clients WHERE id = ?");
+    $nameStmt->bind_param("i", $client_id);
+    $nameStmt->execute();
+    $client_name = $nameStmt->get_result()->fetch_assoc()['full_name'] ?? '';
+    $nameStmt->close();
+
+    echo json_encode([
+        'success'        => true,
+        'client_name'    => $client_name,
+        'invoice_total'  => round($invoice_total, 2),
+        'paid_total'     => round($paid_total, 2),
+        'unpaid_total'   => round($unpaid, 2),
+        'currency'       => $currency
+    ]);
+    exit();
+}
+
+// =========================
 // DELETE SALE
 // =========================
 if (isset($_GET['delete_id'])) {
@@ -127,9 +175,7 @@ $filter_from     = isset($_GET['from_date']) ? trim($_GET['from_date']) : '';
 $filter_to       = isset($_GET['to_date']) ? trim($_GET['to_date']) : '';
 $search_invoice  = isset($_GET['search_invoice']) ? trim($_GET['search_invoice']) : '';
 
-// Build WHERE for the sales list
 $saleWhere = [];
-$clientParam = 0;
 if ($filter_client > 0) {
     $saleWhere[] = "s.client_id = " . $filter_client;
 }
@@ -172,9 +218,6 @@ if ($total_result) {
 // =========================
 // CLIENT SUMMARY TABLE
 // =========================
-// Same date filter applies to the summary table.
-// Total Sales (invoices), Total Paid (payments), Total Unpaid
-
 $dateCondSales = "";
 $dateCondPay = "";
 
@@ -239,7 +282,6 @@ if ($summaryResult) {
         $r['usd_unpaid'] = $r['usd_invoiced'] - $r['usd_paid'];
         $r['afn_unpaid'] = $r['afn_invoiced'] - $r['afn_paid'];
         
-        // Skip clients with no activity if filters are applied
         if (($filter_from !== '' || $filter_to !== '' || $filter_client > 0) 
             && $r['usd_invoiced'] == 0 && $r['afn_invoiced'] == 0 
             && $r['usd_paid'] == 0 && $r['afn_paid'] == 0) {
@@ -269,7 +311,6 @@ if ($clientResult) {
 
 $today_date = date('Y-m-d');
 
-// Active client name for display
 $active_client_name = '';
 if ($filter_client > 0) {
     foreach ($clients_list as $cl) {
@@ -375,6 +416,65 @@ if ($filter_client > 0) {
         .form-group input[type="date"] { direction: ltr; text-align: right; }
         .form-group input[type="file"] { padding: 8px; }
 
+        /* ===== LIVE BALANCE PANEL ===== */
+        .balance-box {
+            background: linear-gradient(135deg, #f8fafc, #eef2f7);
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 18px;
+            display: none;
+        }
+        .balance-box.active { display: block; animation: fadeIn 0.3s ease; }
+        .balance-box .balance-client {
+            font-weight: 700;
+            color: var(--primary-color);
+            font-size: 1rem;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .balance-box .balance-client i { color: var(--accent-color); }
+        .balance-rows { display: flex; flex-direction: column; gap: 8px; }
+        .balance-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            background: #ffffff;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            border-right: 4px solid #cbd5e1;
+        }
+        .balance-row .label { color: var(--text-muted); font-weight: 600; }
+        .balance-row .value { font-weight: 700; }
+        .balance-row.invoice { border-right-color: var(--primary-color); }
+        .balance-row.invoice .value { color: var(--primary-color); }
+        .balance-row.paid { border-right-color: #16a34a; }
+        .balance-row.paid .value { color: #16a34a; }
+        .balance-row.unpaid { background: #fef3c7; border-right-color: #d97706; }
+        .balance-row.unpaid .value { color: #d97706; font-size: 1.05rem; }
+        .balance-row.new-total { background: #dbeafe; border-right-color: #2563eb; }
+        .balance-row.new-total .value { color: #2563eb; font-size: 1.05rem; }
+
+        .balance-loading { display: none; padding: 15px; text-align: center; color: var(--text-muted); font-size: 0.9rem; }
+        .balance-loading.active { display: block; }
+        .balance-error {
+            display: none;
+            padding: 12px 16px;
+            background: #fee2e2;
+            color: #991b1b;
+            border-right: 4px solid #dc2626;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 0.88rem;
+            font-weight: 600;
+        }
+        .balance-error.active { display: block; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
         .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 20px; border: none; border-radius: 10px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: var(--transition); font-family: inherit; text-decoration: none; }
         .btn-primary { background: var(--primary-color); color: white; width: 100%; box-shadow: var(--shadow); }
         .btn-primary:hover { background: var(--secondary-color); transform: translateY(-2px); box-shadow: 0 15px 30px rgba(30,60,114,0.2); }
@@ -425,27 +525,95 @@ if ($filter_client > 0) {
             font-size: 0.82rem; font-weight: 600;
         }
         .filter-chip i { color: var(--accent-color); }
-        .filter-chip .remove-chip {
-            background: rgba(255,255,255,0.2);
-            border-radius: 50%; width: 18px; height: 18px;
-            display: inline-flex; align-items: center; justify-content: center;
-            cursor: pointer; color: white; font-size: 0.7rem;
-            text-decoration: none;
-        }
-        .filter-chip .remove-chip:hover { background: var(--danger-color); }
 
-        /* ===== SUMMARY TABLE ===== */
+        /* ===== SUMMARY TABLE SEARCH ===== */
+        .summary-search-bar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .summary-search-bar .search-input-wrap {
+            flex: 1;
+            min-width: 240px;
+            position: relative;
+        }
+        .summary-search-bar .search-input-wrap i {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--accent-color);
+            font-size: 0.95rem;
+            pointer-events: none;
+        }
+        .summary-search-bar input[type="text"] {
+            width: 100%;
+            padding: 12px 42px 12px 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            background: #ffffff;
+            transition: var(--transition);
+            text-align: right;
+        }
+        .summary-search-bar input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(30,60,114,0.1);
+        }
+        .summary-search-bar .filter-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background: #eff6ff;
+            color: #1e40af;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: 1px solid #bfdbfe;
+        }
+
+        /* ===== SUMMARY TABLE (fixed 300px height with scroll) ===== */
         .summary-table-wrapper {
             overflow-x: auto;
+            overflow-y: auto;
+            max-height: 300px;
             border-radius: 12px;
             border: 2px solid #e2e8f0;
+            background: #ffffff;
+        }
+        .summary-table-wrapper::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        .summary-table-wrapper::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 8px;
+        }
+        .summary-table-wrapper::-webkit-scrollbar-thumb {
+            background: var(--accent-color);
+            border-radius: 8px;
+        }
+        .summary-table-wrapper::-webkit-scrollbar-thumb:hover {
+            background: #d4a017;
         }
         .summary-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.88rem;
+            min-width: 900px;
         }
         .summary-table thead {
+            background: var(--primary-color);
+        }
+        .summary-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 5;
             background: var(--primary-color);
         }
         .summary-table th {
@@ -455,6 +623,7 @@ if ($filter_client > 0) {
             font-size: 0.82rem;
             text-align: center;
             border-left: 1px solid rgba(255,255,255,0.1);
+            white-space: nowrap;
         }
         .summary-table th:first-child { border-left: none; }
         .summary-table th.usd-header { background: #16a34a; }
@@ -462,11 +631,12 @@ if ($filter_client > 0) {
         .summary-table th.unpaid-header { background: #f59e0b; }
 
         .summary-table td {
-            padding: 13px 12px;
+            padding: 12px 12px;
             text-align: center;
             border-bottom: 1px solid #e2e8f0;
             border-left: 1px solid #f1f5f9;
             font-weight: 600;
+            white-space: nowrap;
         }
         .summary-table td:first-child { border-left: none; }
         .summary-table td.client-name-cell {
@@ -475,45 +645,40 @@ if ($filter_client > 0) {
             color: var(--primary-color);
             background: #f8fafc;
             font-size: 0.92rem;
+            position: sticky;
+            right: 0;
+            z-index: 2;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.05);
         }
-        .summary-table .paid-value {
-            color: #16a34a;
-            font-weight: 700;
-        }
-        .summary-table .unpaid-value {
-            color: #d97706;
-            font-weight: 700;
-        }
-        .summary-table .unpaid-value.zero {
-            color: #16a34a;
-        }
-        .summary-table .unpaid-value.big {
-            color: #dc2626;
-        }
-        .summary-table tbody tr:hover {
-            background: #f8fafc;
-        }
-        .summary-table tbody tr:hover td.client-name-cell {
-            background: #eef2f7;
-        }
-        .summary-table tbody tr.row-has-unpaid {
-            background: #fffbeb;
-        }
-        .summary-table tbody tr.row-has-unpaid:hover {
-            background: #fef3c7;
-        }
+        .summary-table .paid-value { color: #16a34a; font-weight: 700; }
+        .summary-table .unpaid-value { color: #d97706; font-weight: 700; }
+        .summary-table .unpaid-value.zero { color: #16a34a; }
+        .summary-table tbody tr:hover { background: #f8fafc; }
+        .summary-table tbody tr:hover td.client-name-cell { background: #eef2f7; }
+        .summary-table tbody tr.row-has-unpaid { background: #fffbeb; }
+        .summary-table tbody tr.row-has-unpaid:hover { background: #fef3c7; }
+        .summary-table tbody tr.row-has-unpaid td.client-name-cell { background: #fef3c7; }
         .summary-table tfoot td {
-            background: #f1f5f9;
+            position: sticky;
+            bottom: 0;
+            background: #e2e8f0;
             font-weight: 800;
             color: var(--primary-color);
             border-top: 3px solid var(--primary-color);
             font-size: 0.9rem;
-            padding: 15px 12px;
+            padding: 14px 12px;
+            text-align: center;
+            white-space: nowrap;
+            z-index: 4;
         }
-        .summary-table tfoot td.client-name-cell {
-            background: #e2e8f0;
+        .summary-table tfoot td:first-child {
+            background: #cbd5e1;
+            text-align: right;
+            position: sticky;
+            right: 0;
+            z-index: 6;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.08);
         }
-
         .paid-badge {
             display: inline-flex; align-items: center; gap: 3px;
             background: #dcfce7; color: #166534;
@@ -521,12 +686,8 @@ if ($filter_client > 0) {
             font-size: 0.7rem; font-weight: 700;
             margin-right: 4px;
         }
-        .unpaid-badge {
-            display: inline-flex; align-items: center; gap: 3px;
-            background: #fef3c7; color: #92400e;
-            padding: 2px 8px; border-radius: 10px;
-            font-size: 0.7rem; font-weight: 700;
-            margin-right: 4px;
+        .no-result-row {
+            display: none;
         }
 
         /* ===== SALES TABLE ===== */
@@ -552,7 +713,6 @@ if ($filter_client > 0) {
         .btn-delete { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; background: var(--danger-color); color: white; text-decoration: none; transition: var(--transition); font-size: 0.82rem; }
         .btn-delete:hover { background: #dc2626; transform: translateY(-2px); box-shadow: 0 6px 15px rgba(239,68,68,0.4); }
 
-        /* Image Lightbox */
         .image-modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 9999; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(6px); }
         .image-modal.active { display: flex; }
         .image-modal img { max-width: 90vw; max-height: 85vh; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); border: 3px solid var(--accent-color); }
@@ -706,11 +866,26 @@ if ($filter_client > 0) {
             <?php endif; ?>
         </div>
 
-        <div class="summary-table-wrapper">
-            <table class="summary-table">
+        <!-- Search by client name -->
+        <div class="summary-search-bar">
+            <div class="search-input-wrap">
+                <i class="fas fa-search"></i>
+                <input type="text" 
+                       id="clientSearchInput" 
+                       placeholder="د پیرودونکي نوم ولیکئ د پلټنې لپاره..."
+                       oninput="filterClientRows()">
+            </div>
+            <span class="filter-info" id="filterInfo">
+                <i class="fas fa-users"></i>
+                <span id="visibleCount"><?php echo count($client_summary); ?></span> پیرودونکي
+            </span>
+        </div>
+
+        <div class="summary-table-wrapper" id="summaryWrapper">
+            <table class="summary-table" id="summaryTable">
                 <thead>
                     <tr>
-                        <th rowspan="2" style="vertical-align: middle;">پیرودونکی</th>
+                        <th rowspan="2" style="vertical-align: middle;">پیرودونکي</th>
                         <th colspan="3" class="usd-header">💵 ډالر (USD)</th>
                         <th colspan="3" class="afn-header">💴 افغاني (AFN)</th>
                     </tr>
@@ -723,15 +898,15 @@ if ($filter_client > 0) {
                         <th class="unpaid-header">پاتې</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="summaryTableBody">
                     <?php if (count($client_summary) > 0): ?>
                         <?php foreach ($client_summary as $cs): 
                             $has_unpaid = ($cs['usd_unpaid'] > 0.01) || ($cs['afn_unpaid'] > 0.01);
                         ?>
-                            <tr class="<?php echo $has_unpaid ? 'row-has-unpaid' : ''; ?>">
+                            <tr class="client-row <?php echo $has_unpaid ? 'row-has-unpaid' : ''; ?>" 
+                                data-client-name="<?php echo htmlspecialchars(mb_strtolower($cs['full_name'], 'UTF-8')); ?>">
                                 <td class="client-name-cell"><?php echo htmlspecialchars($cs['full_name']); ?></td>
 
-                                <!-- USD -->
                                 <td><?php echo number_format($cs['usd_invoiced'], 2); ?> $</td>
                                 <td class="paid-value"><?php echo number_format($cs['usd_paid'], 2); ?> $</td>
                                 <td class="unpaid-value <?php echo ($cs['usd_unpaid'] <= 0.01) ? 'zero' : ''; ?>">
@@ -741,7 +916,6 @@ if ($filter_client > 0) {
                                     <?php endif; ?>
                                 </td>
 
-                                <!-- AFN -->
                                 <td><?php echo number_format($cs['afn_invoiced'], 2); ?> ؋</td>
                                 <td class="paid-value"><?php echo number_format($cs['afn_paid'], 2); ?> ؋</td>
                                 <td class="unpaid-value <?php echo ($cs['afn_unpaid'] <= 0.01) ? 'zero' : ''; ?>">
@@ -764,7 +938,7 @@ if ($filter_client > 0) {
                     <?php endif; ?>
                 </tbody>
                 <?php if (count($client_summary) > 0): ?>
-                <tfoot>
+                <tfoot id="summaryTableFoot">
                     <tr>
                         <td class="client-name-cell">ټول</td>
                         <td><?php echo number_format($grand_usd_inv, 2); ?> $</td>
@@ -794,7 +968,7 @@ if ($filter_client > 0) {
 
                 <div class="form-group">
                     <label><i class="fas fa-user"></i> پیرودونکی *</label>
-                    <select name="client_id" required>
+                    <select name="client_id" id="saleClientSelect" required>
                         <option value="">-- پیرودونکی غوره کړئ --</option>
                         <?php foreach ($clients_list as $cl): ?>
                             <option value="<?php echo $cl['id']; ?>"><?php echo htmlspecialchars($cl['full_name']); ?></option>
@@ -811,15 +985,29 @@ if ($filter_client > 0) {
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-money-bill-wave"></i> د پیسو ډول *</label>
-                    <select name="currency" required>
+                    <select name="currency" id="saleCurrencySelect" required>
                         <option value="">-- د پیسو ډول غوره کړئ --</option>
                         <option value="USD">ډالر (USD)</option>
                         <option value="AFN">افغاني (AFN)</option>
                     </select>
                 </div>
+
+                <!-- ===== LIVE BALANCE PANEL ===== -->
+                <div class="balance-error" id="saleBalanceError"></div>
+                <div class="balance-loading" id="saleBalanceLoading">
+                    <i class="fas fa-spinner fa-spin"></i> محاسبه روانه ده...
+                </div>
+                <div class="balance-box" id="saleBalanceBox">
+                    <div class="balance-client">
+                        <i class="fas fa-user-circle"></i>
+                        <span id="saleBalanceClientName"></span>
+                    </div>
+                    <div class="balance-rows" id="saleBalanceRows"></div>
+                </div>
+
                 <div class="form-group">
                     <label><i class="fas fa-dollar-sign"></i> ټوله اندازه *</label>
-                    <input type="number" name="total_amount" step="0.01" placeholder="0.00" required>
+                    <input type="number" name="total_amount" id="saleTotalInput" step="0.01" placeholder="0.00" required>
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-image"></i> د فاکتور عکس</label>
@@ -916,6 +1104,7 @@ if ($filter_client > 0) {
 </div>
 
 <script>
+    // ===== Image Lightbox =====
     const imageModal = document.getElementById('imageModal');
     const modalImage = document.getElementById('modalImage');
 
@@ -935,6 +1124,140 @@ if ($filter_client > 0) {
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && imageModal.classList.contains('active')) closeImage();
     });
+
+    // ===== LIVE BALANCE FOR SALES PAGE =====
+    const saleClientSelect = document.getElementById('saleClientSelect');
+    const saleCurrencySelect = document.getElementById('saleCurrencySelect');
+    const saleTotalInput = document.getElementById('saleTotalInput');
+    const saleBalanceBox = document.getElementById('saleBalanceBox');
+    const saleBalanceLoading = document.getElementById('saleBalanceLoading');
+    const saleBalanceError = document.getElementById('saleBalanceError');
+    const saleBalanceClientName = document.getElementById('saleBalanceClientName');
+    const saleBalanceRows = document.getElementById('saleBalanceRows');
+
+    let saleCurrentBalance = null;
+    const SALES_AJAX_URL = window.location.pathname;
+
+    function saleShowError(msg) {
+        saleBalanceError.textContent = '⚠ ' + msg;
+        saleBalanceError.classList.add('active');
+    }
+    function saleHideError() {
+        saleBalanceError.classList.remove('active');
+    }
+
+    function fetchSaleBalance() {
+        const clientId = saleClientSelect.value;
+        const currency = saleCurrencySelect.value;
+
+        if (!clientId || !currency) {
+            saleBalanceBox.classList.remove('active');
+            saleCurrentBalance = null;
+            return;
+        }
+
+        const clientName = saleClientSelect.options[saleClientSelect.selectedIndex].text;
+        saleBalanceClientName.textContent = clientName;
+
+        saleBalanceLoading.classList.add('active');
+        saleBalanceBox.classList.remove('active');
+        saleHideError();
+
+        const url = SALES_AJAX_URL + '?ajax_client_balance=1&client_id=' +
+                    encodeURIComponent(clientId) +
+                    '&currency=' + encodeURIComponent(currency);
+
+        fetch(url)
+            .then(response => response.text())
+            .then(text => {
+                saleBalanceLoading.classList.remove('active');
+
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    saleShowError('Server did not return JSON.');
+                    console.error('Raw response:', text);
+                    return;
+                }
+
+                if (!data.success) {
+                    saleShowError(data.message || 'Unknown error');
+                    return;
+                }
+
+                saleCurrentBalance = data;
+                renderSaleBalance(data, 0);
+                saleBalanceBox.classList.add('active');
+            })
+            .catch(err => {
+                saleBalanceLoading.classList.remove('active');
+                saleShowError('Network error: ' + err.message);
+            });
+    }
+
+    function renderSaleBalance(data, newAmount) {
+        const symbol = data.currency === 'USD' ? '$' : '؋';
+        const invoiced = data.invoice_total;
+        const paid = data.paid_total;
+        const unpaid = data.unpaid_total;
+        const newTotal = unpaid + newAmount;
+
+        let html = `
+            <div class="balance-row invoice">
+                <span class="label">ټول فاکتورونه</span>
+                <span class="value">${invoiced.toLocaleString('en-US', {minimumFractionDigits: 2})} ${symbol}</span>
+            </div>
+            <div class="balance-row paid">
+                <span class="label">تادیه شوي</span>
+                <span class="value">${paid.toLocaleString('en-US', {minimumFractionDigits: 2})} ${symbol}</span>
+            </div>
+            <div class="balance-row unpaid">
+                <span class="label">پاتې (بې تادیه)</span>
+                <span class="value">${unpaid.toLocaleString('en-US', {minimumFractionDigits: 2})} ${symbol}</span>
+            </div>
+        `;
+
+        if (newAmount > 0) {
+            html += `
+                <div class="balance-row new-total">
+                    <span class="label">+ د نوي فاکتور سره</span>
+                    <span class="value">${newTotal.toLocaleString('en-US', {minimumFractionDigits: 2})} ${symbol}</span>
+                </div>
+            `;
+        }
+
+        saleBalanceRows.innerHTML = html;
+    }
+
+    saleClientSelect.addEventListener('change', fetchSaleBalance);
+    saleCurrencySelect.addEventListener('change', fetchSaleBalance);
+
+    saleTotalInput.addEventListener('input', function() {
+        if (saleCurrentBalance) {
+            const val = parseFloat(this.value) || 0;
+            renderSaleBalance(saleCurrentBalance, val);
+        }
+    });
+
+    // ===== SEARCH IN CLIENT SUMMARY TABLE =====
+    function filterClientRows() {
+        const searchValue = document.getElementById('clientSearchInput').value.toLowerCase().trim();
+        const rows = document.querySelectorAll('#summaryTableBody tr.client-row');
+        let visibleCount = 0;
+
+        rows.forEach(row => {
+            const name = row.getAttribute('data-client-name') || '';
+            if (searchValue === '' || name.includes(searchValue)) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        document.getElementById('visibleCount').textContent = visibleCount;
+    }
 </script>
 
 </body>
