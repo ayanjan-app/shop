@@ -26,7 +26,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $login_error = "پټ‌نوم غلط دی"; 
         } 
     } else { 
-        $login_error = "کارن ونه موندل شو"; 
+        $login_error = "نوم ونه موندل شو"; 
     } 
     $stmt->close(); 
 } 
@@ -414,11 +414,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     <!-- د ننوتلو فورمه -->
     <form method="POST" id="loginForm">
       <div class="form-group">
-        <label class="form-label" for="username">کارن نوم</label>
+        <label class="form-label" for="username"> نوم</label>
         <div class="input-wrapper">
           <i class="fas fa-user input-icon"></i>
           <input type="text" name="username" id="username" class="form-input" 
-                 placeholder="خپل کارن نوم ولیکئ" 
+                 placeholder="خپل  نوم ولیکئ" 
                  required autocomplete="username"
                  value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>">
         </div>

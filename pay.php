@@ -675,6 +675,47 @@ $today_date = date('Y-m-d');
             margin-right: 4px;
         }
 
+        /* ===== BILL PRINT BUTTON ===== */
+        .btn-bill-print {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 6px 12px;
+            background: linear-gradient(135deg, #1e3c72, #2b4a7a);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            font-family: inherit;
+            text-decoration: none;
+            white-space: nowrap;
+            margin-right: 8px;
+        }
+        .btn-bill-print:hover {
+            background: linear-gradient(135deg, #16a34a, #15803d);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(30,60,114,0.4);
+        }
+        .btn-bill-print i {
+            font-size: 0.85rem;
+        }
+        .client-name-cell {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .client-name-text {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
         /* ===== PAYMENTS TABLE ===== */
         .table-wrapper {
             overflow-x: auto;
@@ -785,6 +826,7 @@ $today_date = date('Y-m-d');
             .search-row .btn { width: 100%; }
             .form-group select { width: 100% !important; font-size: 16px !important; }
             .balance-table tbody td, .balance-table thead th { font-size: 0.78rem; padding: 8px 6px; }
+            .btn-bill-print { padding: 5px 8px; font-size: 0.7rem; }
         }
     </style>
 </head>
@@ -852,11 +894,12 @@ $today_date = date('Y-m-d');
             <span>
                 <strong>ښي اړخ (سره):</strong> افغاني حساب &nbsp;|&nbsp;
                 <strong>کیڼ اړخ (شین):</strong> ډالري حساب &nbsp;|&nbsp;
-                <strong>ژېړه کرښه:</strong> پاتې پیسې لري
+                <strong>ژېړه کرښه:</strong> پاتې پیسې لري &nbsp;|&nbsp;
+                <strong>بیل:</strong> د پیرودونکي بیل چاپ
             </span>
         </div>
 
-        <!-- ✅ Search bar for filtering clients by name -->
+        <!-- Search bar for filtering clients by name -->
         <div class="summary-search-bar">
             <div class="search-input-wrap">
                 <i class="fas fa-search"></i>
@@ -871,7 +914,7 @@ $today_date = date('Y-m-d');
             </span>
         </div>
 
-        <!-- ✅ 300px height with vertical scroll -->
+        <!-- 300px height with vertical scroll -->
         <div class="table-scroll">
             <table class="balance-table" id="balanceTable">
                 <thead>
@@ -894,7 +937,15 @@ $today_date = date('Y-m-d');
                         ?>
                             <tr class="client-row <?php echo $has_unpaid ? 'row-has-unpaid' : ''; ?>"
                                 data-client-name="<?php echo htmlspecialchars(mb_strtolower($cb['full_name'], 'UTF-8')); ?>">
-                                <td class="client-name-cell"><?php echo htmlspecialchars($cb['full_name']); ?></td>
+                                <td class="client-name-cell">
+                                    <span class="client-name-text"><?php echo htmlspecialchars($cb['full_name']); ?></span>
+                                    <a href="bill_print.php?client_id=<?php echo $cb['id']; ?>" 
+                                       target="_blank" 
+                                       class="btn-bill-print"
+                                       title="د بیل چاپ">
+                                        <i class="fas fa-print"></i> بیل
+                                    </a>
+                                </td>
 
                                 <!-- AFN -->
                                 <td class="invoiced-value"><?php echo number_format($cb['afn_invoiced'], 2); ?> ؋</td>
@@ -1365,4 +1416,4 @@ $today_date = date('Y-m-d');
 </script>
 
 </body>
-</html>s
+</html>
