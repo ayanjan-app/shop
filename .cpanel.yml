@@ -6,3 +6,11 @@ deployment:
     - /bin/cp login.php $DEPLOYPATH
     - /bin/cp config.php $DEPLOYPATH
     - /bin/cp db.php $DEPLOYPATH
+        - /bin/cp client.php $DEPLOYPATH
+         - /bin/cp dashboard.php $DEPLOYPATH
+          - /bin/cp expenses.php $DEPLOYPATH
+           - /bin/cp logout.php $DEPLOYPATH
+            - /bin/cp pay.php $DEPLOYPATH
+             - /bin/cp register.php $DEPLOYPATH
+              - /bin/cp save.php $DEPLOYPATH
+               - /bin/cp sidebar.php $DEPLOYPATH
