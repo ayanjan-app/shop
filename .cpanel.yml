@@ -1,0 +1,8 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/naqibullah/public_html
+    - /bin/cp index.php $DEPLOYPATH
+    - /bin/cp login.php $DEPLOYPATH
+    - /bin/cp config.php $DEPLOYPATH
+    - /bin/cp db.php $DEPLOYPATH
