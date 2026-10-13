@@ -14,3 +14,7 @@ deployment:
              - /bin/cp register.php $DEPLOYPATH
               - /bin/cp save.php $DEPLOYPATH
                - /bin/cp sidebar.php $DEPLOYPATH
+                 - /bin/cp sale.php $DEPLOYPATH
+                  - /bin/cp sarafe.php $DEPLOYPATH
+                   - /bin/cp backup_manager.php $DEPLOYPATH
+                 
