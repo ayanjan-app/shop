@@ -7,6 +7,14 @@ if(!isset($_SESSION['user_id'])) {
     exit();
 }
 
+// =========================
+// PHP CONFIG FOR FAST UPLOADS
+// =========================
+@ini_set('upload_max_filesize', '10M');
+@ini_set('post_max_size', '12M');
+@ini_set('memory_limit', '128M');
+@ini_set('max_execution_time', '60');
+
 // Create upload folder if it doesn't exist
 $uploadDir = __DIR__ . '/uploads/clients/';
 if (!file_exists($uploadDir)) {
@@ -24,6 +32,68 @@ if (isset($_SESSION['flash_success'])) {
 if (isset($_SESSION['flash_error'])) {
     $error_msg = $_SESSION['flash_error'];
     unset($_SESSION['flash_error']);
+}
+
+// =========================
+// SERVER-SIDE IMAGE COMPRESSION (GD)
+// =========================
+function compressImageServer($sourcePath, $destPath, $maxSizeKB = 50, $maxDimension = 800) {
+    if (!function_exists('imagecreatefromstring')) return false;
+
+    $info = @getimagesize($sourcePath);
+    if (!$info) return false;
+
+    $mime = $info['mime'];
+    $data = file_get_contents($sourcePath);
+    if ($data === false) return false;
+
+    $src = @imagecreatefromstring($data);
+    if (!$src) return false;
+
+    $origW = imagesx($src);
+    $origH = imagesy($src);
+
+    // Calculate new dimensions
+    $ratio = min($maxDimension / $origW, $maxDimension / $origH, 1);
+    $newW = max(1, (int)round($origW * $ratio));
+    $newH = max(1, (int)round($origH * $ratio));
+
+    // Create canvas with white background (JPEG has no alpha)
+    $dst = imagecreatetruecolor($newW, $newH);
+    $white = imagecolorallocate($dst, 255, 255, 255);
+    imagefilledrectangle($dst, 0, 0, $newW, $newH, $white);
+
+    // Preserve transparency for PNG/GIF
+    if ($mime === 'image/png' || $mime === 'image/gif') {
+        imagealphablending($dst, false);
+        imagesavealpha($dst, true);
+        $transparent = imagecolorallocatealpha($dst, 255, 255, 255, 127);
+        imagefilledrectangle($dst, 0, 0, $newW, $newH, $transparent);
+        imagealphablending($dst, true);
+    }
+
+    imagecopyresampled($dst, $src, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+
+    // Binary search for quality under maxSizeKB
+    $minQ = 10; $maxQ = 95; $bestQ = 60;
+    for ($i = 0; $i < 8; $i++) {
+        $midQ = (int)(($minQ + $maxQ) / 2);
+        ob_start();
+        imagejpeg($dst, null, $midQ);
+        $size = ob_get_clean();
+        if (strlen($size) / 1024 <= $maxSizeKB) {
+            $bestQ = $midQ;
+            $minQ = $midQ + 1;
+        } else {
+            $maxQ = $midQ - 1;
+        }
+        if ($minQ > $maxQ) break;
+    }
+
+    $saved = imagejpeg($dst, $destPath, $bestQ);
+    imagedestroy($src);
+    imagedestroy($dst);
+    return $saved;
 }
 
 // =========================
@@ -58,20 +128,27 @@ if (isset($_POST['add_client'])) {
         $checkStmt->close();
     }
 
-    // Handle picture upload
+    // Handle picture upload (with server-side compression)
     if (!$hasError && isset($_FILES['picture']) && $_FILES['picture']['error'] === UPLOAD_ERR_OK) {
         $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         $ext = strtolower(pathinfo($_FILES['picture']['name'], PATHINFO_EXTENSION));
 
         if (in_array($ext, $allowed)) {
-            $newName = 'client_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+            $newName = 'client_' . time() . '_' . bin2hex(random_bytes(4)) . '.jpg';
             $target  = $uploadDir . $newName;
 
-            if (move_uploaded_file($_FILES['picture']['tmp_name'], $target)) {
+            if (compressImageServer($_FILES['picture']['tmp_name'], $target, 50, 800)) {
                 $picturePath = 'uploads/clients/' . $newName;
             } else {
-                $_SESSION['flash_error'] = "د عکس پورته کول ناکام شول!";
-                $hasError = true;
+                // Fallback: move original if compression fails
+                $newName = 'client_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+                $target  = $uploadDir . $newName;
+                if (move_uploaded_file($_FILES['picture']['tmp_name'], $target)) {
+                    $picturePath = 'uploads/clients/' . $newName;
+                } else {
+                    $_SESSION['flash_error'] = "د عکس پورته کول ناکام شول!";
+                    $hasError = true;
+                }
             }
         } else {
             $_SESSION['flash_error'] = "یوازې JPG، PNG، GIF، WEBP عکسونه اجازه لري.";
@@ -91,7 +168,6 @@ if (isset($_POST['add_client'])) {
         $stmt->close();
     }
 
-    // PRG: redirect to prevent duplicate submission on refresh
     header("Location: " . strtok($_SERVER["REQUEST_URI"], '?'));
     exit();
 }
@@ -140,22 +216,22 @@ if (isset($_POST['update_client'])) {
 
     $newPicturePath = $currentPicture;
 
-    // Handle new picture upload
+    // Handle new picture upload (with server-side compression)
     if (!$hasError && isset($_FILES['picture']) && $_FILES['picture']['error'] === UPLOAD_ERR_OK) {
         $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         $ext = strtolower(pathinfo($_FILES['picture']['name'], PATHINFO_EXTENSION));
 
         if (in_array($ext, $allowed)) {
-            $newName = 'client_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+            $newName = 'client_' . time() . '_' . bin2hex(random_bytes(4)) . '.jpg';
             $target  = $uploadDir . $newName;
 
-            if (move_uploaded_file($_FILES['picture']['tmp_name'], $target)) {
+            if (compressImageServer($_FILES['picture']['tmp_name'], $target, 50, 800)) {
                 if (!empty($currentPicture) && file_exists(__DIR__ . '/' . $currentPicture)) {
                     @unlink(__DIR__ . '/' . $currentPicture);
                 }
                 $newPicturePath = 'uploads/clients/' . $newName;
             } else {
-                $_SESSION['flash_error'] = "د عکس پورته کول ناکام شول!";
+                $_SESSION['flash_error'] = "د عکس پروسس کول ناکام شول!";
                 $hasError = true;
             }
         } else {
@@ -325,6 +401,7 @@ if ($provResult) {
         .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 20px; border: none; border-radius: 10px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: var(--transition); font-family: inherit; text-decoration: none; }
         .btn-primary { background: var(--primary-color); color: white; width: 100%; box-shadow: var(--shadow); }
         .btn-primary:hover { background: var(--secondary-color); transform: translateY(-2px); box-shadow: 0 15px 30px rgba(30,60,114,0.2); }
+        .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
         .btn-secondary { background: var(--accent-color); color: var(--primary-color); box-shadow: var(--shadow); }
         .btn-secondary:hover { background: #d4a017; transform: translateY(-2px); }
         .btn-reset { background: #f1f5f9; color: var(--text-muted); border: 2px solid #e2e8f0; }
@@ -497,6 +574,17 @@ if ($provResult) {
             .filter-row { flex-direction: column; align-items: stretch; }
             .filter-row .btn { flex: 1; }
         }
+
+        /* Compression status indicator */
+        .compress-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .compress-hint i { color: var(--accent-color); }
     </style>
 </head>
 <body>
@@ -538,7 +626,11 @@ if ($provResult) {
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-image"></i> عکس</label>
-                    <input type="file" name="picture" accept="image/*">
+                    <input type="file" name="picture" accept="image/*" data-compress>
+                    <div class="compress-hint">
+                        <i class="fas fa-magic"></i>
+                        عکس به اتوماتیک ~50KB ته کمپریس شي
+                    </div>
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-phone"></i> تلیفون</label>
@@ -634,6 +726,7 @@ if ($provResult) {
                                             <img src="<?php echo htmlspecialchars($c['picture']); ?>" 
                                                  class="client-avatar" 
                                                  alt="عکس"
+                                                 loading="lazy"
                                                  onclick="openImage('<?php echo htmlspecialchars($c['picture']); ?>', '<?php echo htmlspecialchars($c['full_name']); ?>')">
                                         <?php else: ?>
                                             <div class="client-avatar-placeholder"><i class="fas fa-user"></i></div>
@@ -721,7 +814,11 @@ if ($provResult) {
             </div>
             <div class="form-group">
                 <label><i class="fas fa-image"></i> نوی عکس (اختیاري)</label>
-                <input type="file" name="picture" accept="image/*">
+                <input type="file" name="picture" accept="image/*" data-compress>
+                <div class="compress-hint">
+                    <i class="fas fa-magic"></i>
+                    عکس به اتوماتیک ~50KB ته کمپریس شي
+                </div>
             </div>
             <div class="form-group">
                 <label><i class="fas fa-phone"></i> تلیفون</label>
@@ -775,6 +872,131 @@ if ($provResult) {
 </div>
 
 <script>
+    // ============================================
+    // IMAGE COMPRESSION - Compress to ~50KB before upload
+    // ============================================
+    async function compressImage(file, maxSizeKB = 50, maxWidth = 800, maxHeight = 800) {
+        return new Promise((resolve, reject) => {
+            // If file is already small, return as-is
+            if (file.size <= maxSizeKB * 1024) {
+                resolve(file);
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    // Calculate new dimensions
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > maxWidth || height > maxHeight) {
+                        const ratio = Math.min(maxWidth / width, maxHeight / height);
+                        width = Math.round(width * ratio);
+                        height = Math.round(height * ratio);
+                    }
+
+                    // Draw to canvas
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+
+                    // White background (for transparent PNGs converted to JPEG)
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(0, 0, width, height);
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Binary search for best quality under maxSizeKB
+                    let minQ = 0.1, maxQ = 0.95, bestBlob = null;
+
+                    const tryQuality = (q) => {
+                        return new Promise(res => {
+                            canvas.toBlob(blob => res(blob), 'image/jpeg', q);
+                        });
+                    };
+
+                    (async () => {
+                        for (let i = 0; i < 8; i++) {
+                            const midQ = (minQ + maxQ) / 2;
+                            const blob = await tryQuality(midQ);
+                            if (blob.size / 1024 <= maxSizeKB) {
+                                bestBlob = blob;
+                                minQ = midQ;
+                            } else {
+                                maxQ = midQ;
+                            }
+                        }
+                        if (!bestBlob) bestBlob = await tryQuality(0.1);
+
+                        // Convert blob back to File object
+                        const compressedFile = new File(
+                            [bestBlob],
+                            file.name.replace(/\.[^.]+$/, '.jpg'),
+                            { type: 'image/jpeg', lastModified: Date.now() }
+                        );
+                        resolve(compressedFile);
+                    })();
+                };
+                img.onerror = reject;
+                img.src = e.target.result;
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // ===== Attach compression to any form with file input =====
+    function attachCompression(formId, btnId, loadingText) {
+        const form = document.getElementById(formId);
+        if (!form) return;
+        const fileInput = form.querySelector('input[type="file"][name="picture"]');
+        const submitBtn = document.getElementById(btnId);
+        if (!submitBtn) return;
+
+        let isCompressing = false;
+
+        form.addEventListener('submit', async function(e) {
+            if (isCompressing) {
+                e.preventDefault();
+                return;
+            }
+            if (fileInput && fileInput.files.length > 0) {
+                e.preventDefault();
+                isCompressing = true;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> عکس کمپریس کیږي...';
+
+                try {
+                    const original = fileInput.files[0];
+                    const compressed = await compressImage(original, 50);
+                    const dt = new DataTransfer();
+                    dt.items.add(compressed);
+                    fileInput.files = dt.files;
+
+                    console.log(`✅ Compressed: ${(original.size/1024).toFixed(1)}KB → ${(compressed.size/1024).toFixed(1)}KB`);
+
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + loadingText;
+                    form.submit();
+                } catch (err) {
+                    console.error('Compression failed:', err);
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + loadingText;
+                    form.submit();
+                }
+            } else {
+                // No file — just show loading
+                setTimeout(() => {
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + loadingText;
+                }, 0);
+            }
+        });
+    }
+
+    attachCompression('clientForm', 'submitBtn', 'خوندي کیږي...');
+    attachCompression('editForm', 'editSubmitBtn', 'تازه کیږي...');
+
     // ===== Image Lightbox =====
     const imageModal = document.getElementById('imageModal');
     const modalImage = document.getElementById('modalImage');
@@ -802,19 +1024,6 @@ if ($provResult) {
             closeImage();
         }
     });
-
-    // ===== Prevent double submit & show loading =====
-    const clientForm = document.getElementById('clientForm');
-    const submitBtn = document.getElementById('submitBtn');
-
-    if (clientForm) {
-        clientForm.addEventListener('submit', function() {
-            setTimeout(function() {
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> خوندي کیږي...';
-            }, 0);
-        });
-    }
 
     // ===== Edit Modal =====
     const editModal = document.getElementById('editModal');
@@ -855,17 +1064,6 @@ if ($provResult) {
             closeEditModal();
         }
     });
-
-    const editForm = document.getElementById('editForm');
-    const editSubmitBtn = document.getElementById('editSubmitBtn');
-    if (editForm) {
-        editForm.addEventListener('submit', function() {
-            setTimeout(function() {
-                editSubmitBtn.disabled = true;
-                editSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> تازه کیږي...';
-            }, 0);
-        });
-    }
 
     // ===== Delete Modal =====
     const deleteModal = document.getElementById('deleteModal');
