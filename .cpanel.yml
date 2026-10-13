@@ -17,4 +17,5 @@ deployment:
                  - /bin/cp sale.php $DEPLOYPATH
                   - /bin/cp sarafe.php $DEPLOYPATH
                    - /bin/cp backup_manager.php $DEPLOYPATH
+                    - /bin/cp bill_print.php $DEPLOYPATH
                  
