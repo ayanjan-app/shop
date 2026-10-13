@@ -7,6 +7,14 @@ if(!isset($_SESSION['user_id'])) {
     exit();
 }
 
+// =========================
+// PHP CONFIG FOR FAST UPLOADS
+// =========================
+@ini_set('upload_max_filesize', '10M');
+@ini_set('post_max_size', '12M');
+@ini_set('memory_limit', '128M');
+@ini_set('max_execution_time', '60');
+
 // Create upload folders
 $uploadDir = __DIR__ . '/uploads/payments/';
 if (!file_exists($uploadDir)) {
@@ -23,6 +31,64 @@ if (isset($_SESSION['flash_success'])) {
 if (isset($_SESSION['flash_error'])) {
     $error_msg = $_SESSION['flash_error'];
     unset($_SESSION['flash_error']);
+}
+
+// =========================
+// SERVER-SIDE IMAGE COMPRESSION (GD)
+// =========================
+function compressImageServer($sourcePath, $destPath, $maxSizeKB = 50, $maxDimension = 800) {
+    if (!function_exists('imagecreatefromstring')) return false;
+
+    $info = @getimagesize($sourcePath);
+    if (!$info) return false;
+
+    $mime = $info['mime'];
+    $data = file_get_contents($sourcePath);
+    if ($data === false) return false;
+
+    $src = @imagecreatefromstring($data);
+    if (!$src) return false;
+
+    $origW = imagesx($src);
+    $origH = imagesy($src);
+
+    $ratio = min($maxDimension / $origW, $maxDimension / $origH, 1);
+    $newW = max(1, (int)round($origW * $ratio));
+    $newH = max(1, (int)round($origH * $ratio));
+
+    $dst = imagecreatetruecolor($newW, $newH);
+    $white = imagecolorallocate($dst, 255, 255, 255);
+    imagefilledrectangle($dst, 0, 0, $newW, $newH, $white);
+
+    if ($mime === 'image/png' || $mime === 'image/gif') {
+        imagealphablending($dst, false);
+        imagesavealpha($dst, true);
+        $transparent = imagecolorallocatealpha($dst, 255, 255, 255, 127);
+        imagefilledrectangle($dst, 0, 0, $newW, $newH, $transparent);
+        imagealphablending($dst, true);
+    }
+
+    imagecopyresampled($dst, $src, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+
+    $minQ = 10; $maxQ = 95; $bestQ = 60;
+    for ($i = 0; $i < 8; $i++) {
+        $midQ = (int)(($minQ + $maxQ) / 2);
+        ob_start();
+        imagejpeg($dst, null, $midQ);
+        $size = ob_get_clean();
+        if (strlen($size) / 1024 <= $maxSizeKB) {
+            $bestQ = $midQ;
+            $minQ = $midQ + 1;
+        } else {
+            $maxQ = $midQ - 1;
+        }
+        if ($minQ > $maxQ) break;
+    }
+
+    $saved = imagejpeg($dst, $destPath, $bestQ);
+    imagedestroy($src);
+    imagedestroy($dst);
+    return $saved;
 }
 
 // =========================
@@ -134,25 +200,27 @@ if (isset($_POST['add_payment'])) {
         $hasError = true;
     }
 
+    // ===== RECEIPT PICTURE (with compression) =====
     if (!$hasError && isset($_FILES['receipt_picture']) && $_FILES['receipt_picture']['error'] === UPLOAD_ERR_OK) {
         $allowed_ext = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         $ext = strtolower(pathinfo($_FILES['receipt_picture']['name'], PATHINFO_EXTENSION));
         if (in_array($ext, $allowed_ext)) {
-            $newName = 'receipt_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+            $newName = 'receipt_' . time() . '_' . bin2hex(random_bytes(4)) . '.jpg';
             $target  = $uploadDir . $newName;
-            if (move_uploaded_file($_FILES['receipt_picture']['tmp_name'], $target)) {
+            if (compressImageServer($_FILES['receipt_picture']['tmp_name'], $target, 50, 800)) {
                 $receiptPicture = 'uploads/payments/' . $newName;
             }
         }
     }
 
+    // ===== NOTEBOOK PICTURE (with compression) =====
     if (!$hasError && isset($_FILES['notebook_picture']) && $_FILES['notebook_picture']['error'] === UPLOAD_ERR_OK) {
         $allowed_ext = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         $ext = strtolower(pathinfo($_FILES['notebook_picture']['name'], PATHINFO_EXTENSION));
         if (in_array($ext, $allowed_ext)) {
-            $newName = 'notebook_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+            $newName = 'notebook_' . time() . '_' . bin2hex(random_bytes(4)) . '.jpg';
             $target  = $uploadDir . $newName;
-            if (move_uploaded_file($_FILES['notebook_picture']['tmp_name'], $target)) {
+            if (compressImageServer($_FILES['notebook_picture']['tmp_name'], $target, 50, 800)) {
                 $notebookPicture = 'uploads/payments/' . $newName;
             }
         }
@@ -400,6 +468,16 @@ $today_date = date('Y-m-d');
         .form-group input[type="date"] { direction: ltr; text-align: right; }
         .form-group input[type="file"] { padding: 8px; }
 
+        .compress-hint {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .compress-hint i { color: var(--accent-color); }
+
         /* ===== LIVE BALANCE PANEL ===== */
         .balance-box {
             background: linear-gradient(135deg, #f8fafc, #eef2f7);
@@ -465,6 +543,7 @@ $today_date = date('Y-m-d');
         .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 20px; border: none; border-radius: 10px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: var(--transition); font-family: inherit; text-decoration: none; }
         .btn-primary { background: var(--primary-color); color: white; width: 100%; box-shadow: var(--shadow); }
         .btn-primary:hover { background: var(--secondary-color); transform: translateY(-2px); box-shadow: 0 15px 30px rgba(30,60,114,0.2); }
+        .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
         .btn-secondary { background: var(--accent-color); color: var(--primary-color); box-shadow: var(--shadow); }
         .btn-secondary:hover { background: #d4a017; transform: translateY(-2px); }
         .btn-reset { background: #f1f5f9; color: var(--text-muted); border: 2px solid #e2e8f0; }
@@ -899,7 +978,6 @@ $today_date = date('Y-m-d');
             </span>
         </div>
 
-        <!-- Search bar for filtering clients by name -->
         <div class="summary-search-bar">
             <div class="search-input-wrap">
                 <i class="fas fa-search"></i>
@@ -914,17 +992,14 @@ $today_date = date('Y-m-d');
             </span>
         </div>
 
-        <!-- 300px height with vertical scroll -->
         <div class="table-scroll">
             <table class="balance-table" id="balanceTable">
                 <thead>
                     <tr>
-                        <!-- AFN side (Right in RTL) -->
                         <th class="client-col">پیرودونکی</th>
                         <th class="afn-header">افغاني<br>فاکتورونه</th>
                         <th class="afn-header">افغاني<br>تادیه شوي</th>
                         <th class="afn-header">پاتې افغاني</th>
-                        <!-- USD side (Left in RTL) -->
                         <th class="usd-header">ډالر<br>فاکتورونه</th>
                         <th class="usd-header">ډالر<br>تادیه شوي</th>
                         <th class="usd-header">پاتې ډالر</th>
@@ -947,7 +1022,6 @@ $today_date = date('Y-m-d');
                                     </a>
                                 </td>
 
-                                <!-- AFN -->
                                 <td class="invoiced-value"><?php echo number_format($cb['afn_invoiced'], 2); ?> ؋</td>
                                 <td class="paid-value"><?php echo number_format($cb['afn_paid'], 2); ?> ؋</td>
                                 <td class="unpaid-value <?php echo ($cb['afn_unpaid'] <= 0.01) ? 'zero' : ''; ?>">
@@ -957,7 +1031,6 @@ $today_date = date('Y-m-d');
                                     <?php endif; ?>
                                 </td>
 
-                                <!-- USD -->
                                 <td class="invoiced-value"><?php echo number_format($cb['usd_invoiced'], 2); ?> $</td>
                                 <td class="paid-value"><?php echo number_format($cb['usd_paid'], 2); ?> $</td>
                                 <td class="unpaid-value <?php echo ($cb['usd_unpaid'] <= 0.01) ? 'zero' : ''; ?>">
@@ -1026,7 +1099,6 @@ $today_date = date('Y-m-d');
                     </select>
                 </div>
 
-                <!-- LIVE BALANCE BOX -->
                 <div class="balance-error" id="balanceError"></div>
                 <div class="balance-loading" id="balanceLoading">
                     <i class="fas fa-spinner fa-spin"></i> محاسبه روانه ده...
@@ -1072,17 +1144,25 @@ $today_date = date('Y-m-d');
 
                 <div class="form-group">
                     <label><i class="fas fa-image"></i> د رسید عکس (اختیاري)</label>
-                    <input type="file" name="receipt_picture" accept="image/*">
+                    <input type="file" name="receipt_picture" accept="image/*" data-compress>
+                    <div class="compress-hint">
+                        <i class="fas fa-magic"></i>
+                        عکس به اتوماتیک ~50KB ته کمپریس شي
+                    </div>
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-book"></i> د نوټ بوک عکس (اختیاري)</label>
-                    <input type="file" name="notebook_picture" accept="image/*">
+                    <input type="file" name="notebook_picture" accept="image/*" data-compress>
+                    <div class="compress-hint">
+                        <i class="fas fa-magic"></i>
+                        عکس به اتوماتیک ~50KB ته کمپریس شي
+                    </div>
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-sticky-note"></i> یادونه</label>
                     <textarea name="note" placeholder="اضافي یادونه"></textarea>
                 </div>
-                <button type="submit" class="btn btn-primary">
+                <button type="submit" class="btn btn-primary" id="paymentSubmitBtn">
                     <i class="fas fa-save"></i> تادیه اضافه کړئ
                 </button>
             </form>
@@ -1172,6 +1252,7 @@ $today_date = date('Y-m-d');
                                                  class="thumb" 
                                                  alt="رسید"
                                                  title="رسید"
+                                                 loading="lazy"
                                                  onclick="openImage('<?php echo htmlspecialchars($row['receipt_picture']); ?>')">
                                         <?php endif; ?>
                                         <?php if (!empty($row['notebook_picture']) && file_exists(__DIR__ . '/' . $row['notebook_picture'])): ?>
@@ -1179,6 +1260,7 @@ $today_date = date('Y-m-d');
                                                  class="thumb" 
                                                  alt="نوټ بوک"
                                                  title="نوټ بوک"
+                                                 loading="lazy"
                                                  onclick="openImage('<?php echo htmlspecialchars($row['notebook_picture']); ?>')">
                                         <?php endif; ?>
                                         <?php if (empty($row['receipt_picture']) && empty($row['notebook_picture'])): ?>
@@ -1232,6 +1314,127 @@ $today_date = date('Y-m-d');
 </div>
 
 <script>
+    // ============================================
+    // IMAGE COMPRESSION - Compress to ~50KB before upload
+    // ============================================
+    async function compressImage(file, maxSizeKB = 50, maxWidth = 800, maxHeight = 800) {
+        return new Promise((resolve, reject) => {
+            if (file.size <= maxSizeKB * 1024) {
+                resolve(file);
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > maxWidth || height > maxHeight) {
+                        const ratio = Math.min(maxWidth / width, maxHeight / height);
+                        width = Math.round(width * ratio);
+                        height = Math.round(height * ratio);
+                    }
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(0, 0, width, height);
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    let minQ = 0.1, maxQ = 0.95, bestBlob = null;
+
+                    const tryQuality = (q) => {
+                        return new Promise(res => {
+                            canvas.toBlob(blob => res(blob), 'image/jpeg', q);
+                        });
+                    };
+
+                    (async () => {
+                        for (let i = 0; i < 8; i++) {
+                            const midQ = (minQ + maxQ) / 2;
+                            const blob = await tryQuality(midQ);
+                            if (blob.size / 1024 <= maxSizeKB) {
+                                bestBlob = blob;
+                                minQ = midQ;
+                            } else {
+                                maxQ = midQ;
+                            }
+                        }
+                        if (!bestBlob) bestBlob = await tryQuality(0.1);
+
+                        const compressedFile = new File(
+                            [bestBlob],
+                            file.name.replace(/\.[^.]+$/, '.jpg'),
+                            { type: 'image/jpeg', lastModified: Date.now() }
+                        );
+                        resolve(compressedFile);
+                    })();
+                };
+                img.onerror = reject;
+                img.src = e.target.result;
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // ===== Compress all file inputs in the payment form on submit =====
+    (function() {
+        const form = document.getElementById('paymentForm');
+        const submitBtn = document.getElementById('paymentSubmitBtn');
+        if (!form || !submitBtn) return;
+
+        let isCompressing = false;
+
+        form.addEventListener('submit', async function(e) {
+            if (isCompressing) {
+                e.preventDefault();
+                return;
+            }
+
+            const fileInputs = form.querySelectorAll('input[type="file"][data-compress]');
+            const filesToCompress = [];
+            fileInputs.forEach(inp => {
+                if (inp.files.length > 0) filesToCompress.push(inp);
+            });
+
+            if (filesToCompress.length > 0) {
+                e.preventDefault();
+                isCompressing = true;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> عکسونه کمپریس کیږي...';
+
+                try {
+                    for (const input of filesToCompress) {
+                        const original = input.files[0];
+                        const compressed = await compressImage(original, 50);
+                        const dt = new DataTransfer();
+                        dt.items.add(compressed);
+                        input.files = dt.files;
+                        console.log(`✅ ${input.name}: ${(original.size/1024).toFixed(1)}KB → ${(compressed.size/1024).toFixed(1)}KB`);
+                    }
+
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> خوندي کیږي...';
+                    form.submit();
+                } catch (err) {
+                    console.error('Compression failed:', err);
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> خوندي کیږي...';
+                    form.submit();
+                }
+            } else {
+                setTimeout(() => {
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> خوندي کیږي...';
+                }, 0);
+            }
+        });
+    })();
+
     // ===== Image Lightbox =====
     const imageModal = document.getElementById('imageModal');
     const modalImage = document.getElementById('modalImage');
