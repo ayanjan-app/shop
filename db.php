@@ -1,4 +1,4 @@
-```php
+
 <?php
 $servername = "localhost";
 $username = "naqibullah_shopuser";
@@ -13,4 +13,3 @@ if ($conn->connect_error) {
 
 $conn->set_charset("utf8mb4");
 ?>
-```
