@@ -907,6 +907,123 @@ $today_date = date('Y-m-d');
             .balance-table tbody td, .balance-table thead th { font-size: 0.78rem; padding: 8px 6px; }
             .btn-bill-print { padding: 5px 8px; font-size: 0.7rem; }
         }
+
+        /* ===== DATE CONVERTER ===== */
+        .date-input-wrap {
+            position: relative;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .date-input-wrap input[type="date"] {
+            flex: 1;
+        }
+        .btn-date-convert {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 12px 14px;
+            background: var(--accent-color);
+            color: var(--primary-color);
+            border: none;
+            border-radius: 10px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: inherit;
+            white-space: nowrap;
+            min-height: 48px;
+        }
+        .btn-date-convert:hover {
+            background: #d4a017;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(230,177,46,0.4);
+        }
+        .date-short {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .date-short i { color: var(--accent-color); }
+
+        .shamsi-date {
+            display: block;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+            direction: rtl;
+        }
+
+        .date-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(5px); }
+        .date-modal.active { display: flex; }
+        .date-modal-content {
+            background: #fff;
+            border-radius: var(--border-radius);
+            padding: 28px;
+            max-width: 460px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            border-top: 4px solid var(--accent-color);
+            animation: fadeIn 0.3s ease;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .date-modal-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 2px solid #f1f5f9; }
+        .date-modal-header i { color: var(--accent-color); font-size: 1.4rem; }
+        .date-modal-header h2 { margin: 0; font-size: 1.15rem; color: var(--primary-color); font-weight: 700; }
+        .date-modal-header .close-x { margin-right: auto; background: #f1f5f9; border: none; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; color: var(--danger-color); font-size: 1rem; }
+        .date-modal-header .close-x:hover { background: #fee2e2; }
+
+        .calendar-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+        .calendar-tabs button {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e2e8f0;
+            background: #f8fafc;
+            color: var(--text-muted);
+            border-radius: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: inherit;
+            font-size: 0.9rem;
+        }
+        .calendar-tabs button.active { background: var(--primary-color); color: white; border-color: var(--primary-color); }
+
+        .date-picker-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+        .date-picker-row select, .date-picker-row input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            background: #fff;
+            text-align: center;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        .date-picker-row select:focus, .date-picker-row input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(30,60,114,0.1); }
+
+        .date-preview-box {
+            background: linear-gradient(135deg, #eff6ff, #f8fafc);
+            border: 2px dashed #93c5fd;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            margin-bottom: 18px;
+        }
+        .date-preview-box .label { font-size: 0.78rem; color: var(--text-muted); font-weight: 700; margin-bottom: 6px; }
+        .date-preview-box .value { font-size: 1.15rem; font-weight: 800; color: var(--primary-color); }
+        .date-preview-box .value + .label { margin-top: 14px; }
+
+        .date-modal-buttons { display: flex; gap: 12px; }
+        .date-modal-buttons .btn { flex: 1; }
     </style>
 </head>
 <body>
@@ -1139,7 +1256,16 @@ $today_date = date('Y-m-d');
 
                 <div class="form-group">
                     <label><i class="fas fa-calendar"></i> نېټه *</label>
-                    <input type="date" name="payment_date" value="<?php echo $today_date; ?>" required>
+                    <div class="date-input-wrap">
+                        <input type="date" name="payment_date" id="paymentDateInput" value="<?php echo $today_date; ?>" required>
+                        <button type="button" class="btn-date-convert" onclick="openDateConverter()">
+                            <i class="fas fa-exchange-alt"></i> شمسي
+                        </button>
+                    </div>
+                    <div class="date-short">
+                        <i class="fas fa-info-circle"></i>
+                        <span id="shamsiPreview">—</span>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -1245,7 +1371,10 @@ $today_date = date('Y-m-d');
                                         </span>
                                     </td>
                                     <td class="amount-cell"><?php echo number_format($row['amount'], 2); ?></td>
-                                    <td><?php echo htmlspecialchars($row['payment_date']); ?></td>
+                                    <td>
+                                        <?php echo htmlspecialchars($row['payment_date']); ?>
+                                        <span class="shamsi-date" data-greg="<?php echo htmlspecialchars($row['payment_date']); ?>"></span>
+                                    </td>
                                     <td>
                                         <?php if (!empty($row['receipt_picture']) && file_exists(__DIR__ . '/' . $row['receipt_picture'])): ?>
                                             <img src="<?php echo htmlspecialchars($row['receipt_picture']); ?>" 
@@ -1311,6 +1440,56 @@ $today_date = date('Y-m-d');
 <div class="image-modal" id="imageModal">
     <button class="image-modal-close" onclick="closeImage()"><i class="fas fa-times"></i></button>
     <img id="modalImage" src="" alt="عکس">
+</div>
+
+<!-- ===== DATE CONVERTER MODAL ===== -->
+<div class="date-modal" id="dateModal">
+    <div class="date-modal-content">
+        <div class="date-modal-header">
+            <i class="fas fa-calendar-alt"></i>
+            <h2>د نېټې کنورټر</h2>
+            <button class="close-x" onclick="closeDateConverter()"><i class="fas fa-times"></i></button>
+        </div>
+
+        <div class="calendar-tabs">
+            <button type="button" id="tabGreg" class="active" onclick="switchCalendar('greg')">میلادي</button>
+            <button type="button" id="tabShamsi" onclick="switchCalendar('shamsi')">شمسي (هجري)</button>
+        </div>
+
+        <!-- Gregorian Picker -->
+        <div id="gregPicker">
+            <div class="date-picker-row">
+                <select id="gDay"></select>
+                <select id="gMonth"></select>
+                <input type="number" id="gYear" min="1900" max="2200">
+            </div>
+        </div>
+
+        <!-- Shamsi Picker -->
+        <div id="shamsiPicker" style="display:none;">
+            <div class="date-picker-row">
+                <select id="sDay"></select>
+                <select id="sMonth"></select>
+                <input type="number" id="sYear" min="1300" max="1500">
+            </div>
+        </div>
+
+        <div class="date-preview-box">
+            <div class="label">میلادي نېټه</div>
+            <div class="value" id="previewGreg">—</div>
+            <div class="label">شمسي نېټه</div>
+            <div class="value" id="previewShamsi">—</div>
+        </div>
+
+        <div class="date-modal-buttons">
+            <button type="button" class="btn btn-reset" onclick="closeDateConverter()">
+                <i class="fas fa-times"></i> لغوه
+            </button>
+            <button type="button" class="btn btn-primary" onclick="applyDate()">
+                <i class="fas fa-check"></i> ومنل
+            </button>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -1616,6 +1795,251 @@ $today_date = date('Y-m-d');
 
         document.getElementById('visibleCount').textContent = visibleCount;
     }
+
+    /* ============================================================
+       SHAMSI ⇄ GREGORIAN DATE CONVERTER
+       ============================================================ */
+    const SHAMSI_MONTHS = ['حمل','ثور','جوزا','سرطان','اسد','سنبله','میزان','عقرب','قوس','جدي','دلو','حوت'];
+    const GREG_MONTHS   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    let currentCalendar = 'greg';
+
+    function gregorianToJDN(gy, gm, gd) {
+        const a = Math.floor((14 - gm) / 12);
+        const y = gy + 4800 - a;
+        const m = gm + 12 * a - 3;
+        return gd + Math.floor((153 * m + 2) / 5) + 365 * y +
+               Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) - 32045;
+    }
+    function jdnToGregorian(jdn) {
+        let a = jdn + 32044;
+        let b = Math.floor((4 * a + 3) / 146097);
+        let c = a - Math.floor((146097 * b) / 4);
+        let d = Math.floor((4 * c + 3) / 1461);
+        let e = c - Math.floor((1461 * d) / 4);
+        let m = Math.floor((5 * e + 2) / 153);
+        return {
+            day:   e - Math.floor((153 * m + 2) / 5) + 1,
+            month: m + 3 - 12 * Math.floor(m / 10),
+            year:  (100 * b + d - 4800 + Math.floor(m / 10)) | 0
+        };
+    }
+    function jdnToShamsi(jdn) {
+        const g = jdnToGregorian(jdn);
+        let gy = g.year, gm = g.month, gd = g.day;
+        let jy = gy - 621;
+        const gDayNo = gregorianToJDN(gy, gm, gd);
+        const jDayNo = gregorianToJDN(jy, 3, 21);
+        let days = gDayNo - jDayNo;
+        if (days < 0) {
+            jy--;
+            days = gDayNo - gregorianToJDN(jy, 3, 21);
+        }
+        let jm, jd;
+        if (days < 186) {
+            jm = Math.floor(days / 31) + 1;
+            jd = (days % 31) + 1;
+        } else {
+            jm = Math.floor((days - 186) / 30) + 7;
+            jd = ((days - 186) % 30) + 1;
+        }
+        return { day: jd, month: jm, year: jy };
+    }
+    function shamsiToGregorian(jy, jm, jd) {
+        let gy = jy + 621;
+        const jDayNo = (jm <= 7) ? (jm - 1) * 31 + jd
+                                 : 186 + (jm - 7) * 30 + jd;
+        const gDayNo = gregorianToJDN(gy, 3, 21) + (jDayNo - 1);
+        return jdnToGregorian(gDayNo);
+    }
+    function gregToShamsi(gy, gm, gd) {
+        const jdn = gregorianToJDN(gy, gm, gd);
+        return jdnToShamsi(jdn);
+    }
+
+    function pad2(n) { return String(n).padStart(2, '0'); }
+    function formatGregDate(gy, gm, gd) {
+        return `${gy}-${pad2(gm)}-${pad2(gd)}`;
+    }
+
+    function openDateConverter() {
+        const mainInput = document.getElementById('paymentDateInput');
+        let gy, gm, gd;
+
+        if (mainInput.value) {
+            const parts = mainInput.value.split('-');
+            gy = parseInt(parts[0], 10);
+            gm = parseInt(parts[1], 10);
+            gd = parseInt(parts[2], 10);
+        } else {
+            const now = new Date();
+            gy = now.getFullYear();
+            gm = now.getMonth() + 1;
+            gd = now.getDate();
+        }
+
+        buildSelects();
+        setGregorian(gy, gm, gd);
+        setShamsi(gy, gm, gd);
+        switchCalendar('greg');
+        updatePreviews();
+
+        document.getElementById('dateModal').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeDateConverter() {
+        document.getElementById('dateModal').classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    function buildSelects() {
+        const gDay = document.getElementById('gDay');
+        const gMonth = document.getElementById('gMonth');
+        const sDay = document.getElementById('sDay');
+        const sMonth = document.getElementById('sMonth');
+
+        gDay.innerHTML = '';
+        gMonth.innerHTML = '';
+        sDay.innerHTML = '';
+        sMonth.innerHTML = '';
+
+        for (let i = 1; i <= 31; i++) {
+            gDay.innerHTML += `<option value="${i}">${i}</option>`;
+            sDay.innerHTML += `<option value="${i}">${i}</option>`;
+        }
+        for (let i = 1; i <= 12; i++) {
+            gMonth.innerHTML += `<option value="${i}">${GREG_MONTHS[i-1]} (${i})</option>`;
+            sMonth.innerHTML += `<option value="${i}">${SHAMSI_MONTHS[i-1]} (${i})</option>`;
+        }
+    }
+
+    function setGregorian(gy, gm, gd) {
+        document.getElementById('gDay').value = gd;
+        document.getElementById('gMonth').value = gm;
+        document.getElementById('gYear').value = gy;
+    }
+    function setShamsi(gy, gm, gd) {
+        const s = gregToShamsi(gy, gm, gd);
+        document.getElementById('sDay').value = s.day;
+        document.getElementById('sMonth').value = s.month;
+        document.getElementById('sYear').value = s.year;
+    }
+
+    function switchCalendar(which) {
+        currentCalendar = which;
+        document.getElementById('tabGreg').classList.toggle('active', which === 'greg');
+        document.getElementById('tabShamsi').classList.toggle('active', which === 'shamsi');
+        document.getElementById('gregPicker').style.display = (which === 'greg') ? '' : 'none';
+        document.getElementById('shamsiPicker').style.display = (which === 'shamsi') ? '' : 'none';
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const gInputs = ['gDay', 'gMonth', 'gYear'];
+        const sInputs = ['sDay', 'sMonth', 'sYear'];
+
+        gInputs.forEach(id => {
+            document.getElementById(id).addEventListener('input', function() {
+                if (currentCalendar !== 'greg') return;
+                const gy = parseInt(document.getElementById('gYear').value, 10);
+                const gm = parseInt(document.getElementById('gMonth').value, 10);
+                const gd = parseInt(document.getElementById('gDay').value, 10);
+                if (gy && gm && gd) {
+                    const s = gregToShamsi(gy, gm, gd);
+                    document.getElementById('sDay').value = s.day;
+                    document.getElementById('sMonth').value = s.month;
+                    document.getElementById('sYear').value = s.year;
+                    updatePreviews();
+                }
+            });
+        });
+
+        sInputs.forEach(id => {
+            document.getElementById(id).addEventListener('input', function() {
+                if (currentCalendar !== 'shamsi') return;
+                const sy = parseInt(document.getElementById('sYear').value, 10);
+                const sm = parseInt(document.getElementById('sMonth').value, 10);
+                const sd = parseInt(document.getElementById('sDay').value, 10);
+                if (sy && sm && sd) {
+                    const g = shamsiToGregorian(sy, sm, sd);
+                    if (g.year) {
+                        document.getElementById('gDay').value = g.day;
+                        document.getElementById('gMonth').value = g.month;
+                        document.getElementById('gYear').value = g.year;
+                        updatePreviews();
+                    }
+                }
+            });
+        });
+
+        const mainInput = document.getElementById('paymentDateInput');
+        if (mainInput) {
+            mainInput.addEventListener('change', updateShamsiShortPreview);
+            mainInput.addEventListener('input', updateShamsiShortPreview);
+        }
+
+        // Fill Shamsi dates in the payments table
+        document.querySelectorAll('.shamsi-date').forEach(el => {
+            const greg = el.getAttribute('data-greg');
+            if (greg) {
+                const parts = greg.split('-');
+                if (parts.length === 3) {
+                    const s = gregToShamsi(parseInt(parts[0],10), parseInt(parts[1],10), parseInt(parts[2],10));
+                    el.textContent = `(${s.year}/${pad2(s.month)}/${pad2(s.day)} شمسي)`;
+                }
+            }
+        });
+
+        updateShamsiShortPreview();
+    });
+
+    function updatePreviews() {
+        const gy = parseInt(document.getElementById('gYear').value, 10);
+        const gm = parseInt(document.getElementById('gMonth').value, 10);
+        const gd = parseInt(document.getElementById('gDay').value, 10);
+        const sy = parseInt(document.getElementById('sYear').value, 10);
+        const sm = parseInt(document.getElementById('sMonth').value, 10);
+        const sd = parseInt(document.getElementById('sDay').value, 10);
+
+        if (gy && gm && gd) {
+            document.getElementById('previewGreg').textContent = `${gy}-${pad2(gm)}-${pad2(gd)}`;
+        }
+        if (sy && sm && sd) {
+            document.getElementById('previewShamsi').textContent = `${sy}-${pad2(sm)}-${pad2(sd)} (${SHAMSI_MONTHS[sm-1]})`;
+        }
+    }
+
+    function updateShamsiShortPreview() {
+        const input = document.getElementById('paymentDateInput');
+        const preview = document.getElementById('shamsiPreview');
+        if (!input || !preview) return;
+        if (!input.value) { preview.textContent = '—'; return; }
+
+        const parts = input.value.split('-');
+        if (parts.length !== 3) return;
+        const s = gregToShamsi(parseInt(parts[0],10), parseInt(parts[1],10), parseInt(parts[2],10));
+        preview.textContent = `شمسي: ${s.year}/${pad2(s.month)}/${pad2(s.day)} (${SHAMSI_MONTHS[s.month-1]})`;
+    }
+
+    function applyDate() {
+        const gy = parseInt(document.getElementById('gYear').value, 10);
+        const gm = parseInt(document.getElementById('gMonth').value, 10);
+        const gd = parseInt(document.getElementById('gDay').value, 10);
+
+        if (!gy || !gm || !gd) {
+            alert('مهرباني وکړئ سمه نېټه ولیکئ');
+            return;
+        }
+
+        const input = document.getElementById('paymentDateInput');
+        input.value = formatGregDate(gy, gm, gd);
+        input.dispatchEvent(new Event('change'));
+        updateShamsiShortPreview();
+        closeDateConverter();
+    }
+
+    document.getElementById('dateModal')?.addEventListener('click', function(e) {
+        if (e.target === this) closeDateConverter();
+    });
 </script>
 
 </body>
