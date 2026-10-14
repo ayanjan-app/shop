@@ -1800,16 +1800,51 @@ $today_date = date('Y-m-d');
        Accurate Shamsi (Afghan/Persian) ⇄ Gregorian Converter
        Based on the well-known Kuwaiti algorithm (jalali.js)
        ============================================================ */
-    const SHAMSI_MONTHS = ['حمل','ثور','جوزا','سرطان','اسد','سنبله','میزان','عقرب','قوس','جدي','دلو','حوت'];
-    const GREG_MONTHS   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+ /* ============================================================
+   Accurate Shamsi (Afghan/Persian) ⇄ Gregorian Converter
+   With strict validation & safe fallbacks
+   ============================================================ */
+const SHAMSI_MONTHS = ['حمل','ثور','جوزا','سرطان','اسد','سنبله','میزان','عقرب','قوس','جدي','دلو','حوت'];
+const GREG_MONTHS   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-    let currentCalendar = 'greg';
+let currentCalendar = 'greg';
 
-    function div(a, b) { return ~~(a / b); }
-    function mod(a, b) { return a - ~~(a / b) * b; }
+function div(a, b) { return ~~(a / b); }
+function mod(a, b) { return a - ~~(a / b) * b; }
+function pad2(n) { return String(n).padStart(2, '0'); }
 
-    // Gregorian → Shamsi (Jalali)
-    function gregToShamsi(gy, gm, gd) {
+// Strict validation: returns {y,m,d} or null
+function parseGregDateSafe(str) {
+    if (!str || typeof str !== 'string') return null;
+    str = str.trim();
+    if (str === '' || str === '0000-00-00' || str.startsWith('0000')) return null;
+
+    // Accept YYYY-MM-DD or YYYY/MM/DD
+    const m = str.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+    if (!m) return null;
+
+    const y = parseInt(m[1], 10);
+    const mo = parseInt(m[2], 10);
+    const d = parseInt(m[3], 10);
+
+    if (!y || !mo || !d) return null;
+    if (y < 1900 || y > 2200) return null;
+    if (mo < 1 || mo > 12) return null;
+    if (d < 1 || d > 31) return null;
+
+    return { y, m: mo, d };
+}
+
+// Gregorian → Shamsi (Jalali) - SAFE
+function gregToShamsi(gy, gm, gd) {
+    try {
+        gy = parseInt(gy, 10);
+        gm = parseInt(gm, 10);
+        gd = parseInt(gd, 10);
+        if (!gy || !gm || !gd || gy < 1900 || gy > 2200 || gm < 1 || gm > 12 || gd < 1 || gd > 31) {
+            return null;
+        }
+
         let jy = (gy <= 1600) ? 0 : 979;
         gy -= (gy <= 1600) ? 621 : 1600;
         const gy2 = (gm > 2) ? (gy + 1) : gy;
@@ -1823,8 +1858,10 @@ $today_date = date('Y-m-d');
                      div(jy, 33) * 8 +
                      div(mod(jy, 33) + 3, 4) +
                      78 + days;
-        let jm, jd;
-        let j_np = div(j_days, 12053);
+
+        if (j_days < 0) return null;
+
+        const j_np = div(j_days, 12053);
         j_days %= 12053;
         jy += 33 * j_np;
         jy += 4 * div(j_days, 1461);
@@ -1833,6 +1870,8 @@ $today_date = date('Y-m-d');
             jy += div(j_days - 1, 365);
             j_days = (j_days - 1) % 365;
         }
+
+        let jm, jd;
         if (j_days < 186) {
             jm = 1 + div(j_days, 31);
             jd = 1 + mod(j_days, 31);
@@ -1840,11 +1879,25 @@ $today_date = date('Y-m-d');
             jm = 7 + div(j_days - 186, 30);
             jd = 1 + mod(j_days - 186, 30);
         }
-        return { year: jy, month: jm, day: jd };
-    }
 
-    // Shamsi (Jalali) → Gregorian
-    function shamsiToGregorian(jy, jm, jd) {
+        if (!jy || !jm || !jd || jm < 1 || jm > 12 || jd < 1 || jd > 31) return null;
+        return { year: jy, month: jm, day: jd };
+    } catch (e) {
+        console.error('gregToShamsi error:', e);
+        return null;
+    }
+}
+
+// Shamsi (Jalali) → Gregorian - SAFE
+function shamsiToGregorian(jy, jm, jd) {
+    try {
+        jy = parseInt(jy, 10);
+        jm = parseInt(jm, 10);
+        jd = parseInt(jd, 10);
+        if (!jy || !jm || !jd || jy < 1300 || jy > 1500 || jm < 1 || jm > 12 || jd < 1 || jd > 31) {
+            return null;
+        }
+
         let gy = (jy <= 979) ? 621 : 1600;
         jy -= (jy <= 979) ? 0 : 979;
         let days = (365 * jy) +
@@ -1852,17 +1905,20 @@ $today_date = date('Y-m-d');
                    div(mod(jy, 33) + 3, 4) +
                    78 + jd +
                    ((jm < 7) ? (jm - 1) * 31 : ((jm - 7) * 30) + 186);
-        let gy2 = (days > 79) ? gy + 1 : gy;
+        const gy2 = (days > 79) ? gy + 1 : gy;
         days -= (days > 79) ? 79 : -1 * (gy2 - gy) * 365;
 
-        while (true) {
-            const leap = (gy2 % 4 === 0 && (gy2 % 100 !== 0 || gy2 % 400 === 0)) ? 366 : 365;
+        let curY = gy2;
+        let guard = 0;
+        while (guard++ < 400) {
+            const leap = (curY % 4 === 0 && (curY % 100 !== 0 || curY % 400 === 0)) ? 366 : 365;
             if (days < leap) break;
             days -= leap;
-            gy2++;
+            curY++;
         }
+
         const g_d_m = [0,31,28,31,30,31,30,31,31,30,31,30,31];
-        const isLeap = (gy2 % 4 === 0 && (gy2 % 100 !== 0 || gy2 % 400 === 0));
+        const isLeap = (curY % 4 === 0 && (curY % 100 !== 0 || curY % 400 === 0));
         let gm = 1;
         while (gm <= 12) {
             let dim = g_d_m[gm];
@@ -1871,192 +1927,221 @@ $today_date = date('Y-m-d');
             days -= dim;
             gm++;
         }
-        return { year: gy2, month: gm, day: days + 1 };
+        const gd = days + 1;
+        if (!curY || !gm || !gd || gm < 1 || gm > 12 || gd < 1 || gd > 31) return null;
+        return { year: curY, month: gm, day: gd };
+    } catch (e) {
+        console.error('shamsiToGregorian error:', e);
+        return null;
+    }
+}
+
+function formatGregDate(gy, gm, gd) {
+    return `${gy}-${pad2(gm)}-${pad2(gd)}`;
+}
+
+function openDateConverter() {
+    const mainInput = document.getElementById('paymentDateInput');
+    let gy, gm, gd;
+
+    const parsed = parseGregDateSafe(mainInput.value);
+    if (parsed) {
+        gy = parsed.y; gm = parsed.m; gd = parsed.d;
+    } else {
+        const now = new Date();
+        gy = now.getFullYear();
+        gm = now.getMonth() + 1;
+        gd = now.getDate();
     }
 
-    function pad2(n) { return String(n).padStart(2, '0'); }
-    function formatGregDate(gy, gm, gd) {
-        return `${gy}-${pad2(gm)}-${pad2(gd)}`;
+    buildSelects();
+    setGregorian(gy, gm, gd);
+    setShamsi(gy, gm, gd);
+    switchCalendar('greg');
+    updatePreviews();
+
+    document.getElementById('dateModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeDateConverter() {
+    document.getElementById('dateModal').classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+function buildSelects() {
+    const gDay = document.getElementById('gDay');
+    const gMonth = document.getElementById('gMonth');
+    const sDay = document.getElementById('sDay');
+    const sMonth = document.getElementById('sMonth');
+
+    gDay.innerHTML = '';
+    gMonth.innerHTML = '';
+    sDay.innerHTML = '';
+    sMonth.innerHTML = '';
+
+    for (let i = 1; i <= 31; i++) {
+        gDay.innerHTML += `<option value="${i}">${i}</option>`;
+        sDay.innerHTML += `<option value="${i}">${i}</option>`;
     }
-
-    function openDateConverter() {
-        const mainInput = document.getElementById('paymentDateInput');
-        let gy, gm, gd;
-
-        if (mainInput.value) {
-            const parts = mainInput.value.split('-');
-            gy = parseInt(parts[0], 10);
-            gm = parseInt(parts[1], 10);
-            gd = parseInt(parts[2], 10);
-        } else {
-            const now = new Date();
-            gy = now.getFullYear();
-            gm = now.getMonth() + 1;
-            gd = now.getDate();
-        }
-
-        buildSelects();
-        setGregorian(gy, gm, gd);
-        setShamsi(gy, gm, gd);
-        switchCalendar('greg');
-        updatePreviews();
-
-        document.getElementById('dateModal').classList.add('active');
-        document.body.style.overflow = 'hidden';
+    for (let i = 1; i <= 12; i++) {
+        gMonth.innerHTML += `<option value="${i}">${GREG_MONTHS[i-1]} (${i})</option>`;
+        sMonth.innerHTML += `<option value="${i}">${SHAMSI_MONTHS[i-1]} (${i})</option>`;
     }
-    function closeDateConverter() {
-        document.getElementById('dateModal').classList.remove('active');
-        document.body.style.overflow = '';
+}
+
+function setGregorian(gy, gm, gd) {
+    document.getElementById('gDay').value = gd;
+    document.getElementById('gMonth').value = gm;
+    document.getElementById('gYear').value = gy;
+}
+function setShamsi(gy, gm, gd) {
+    const s = gregToShamsi(gy, gm, gd);
+    if (!s) {
+        document.getElementById('sDay').value = 1;
+        document.getElementById('sMonth').value = 1;
+        document.getElementById('sYear').value = 1400;
+        return;
     }
+    document.getElementById('sDay').value = s.day;
+    document.getElementById('sMonth').value = s.month;
+    document.getElementById('sYear').value = s.year;
+}
 
-    function buildSelects() {
-        const gDay = document.getElementById('gDay');
-        const gMonth = document.getElementById('gMonth');
-        const sDay = document.getElementById('sDay');
-        const sMonth = document.getElementById('sMonth');
+function switchCalendar(which) {
+    currentCalendar = which;
+    document.getElementById('tabGreg').classList.toggle('active', which === 'greg');
+    document.getElementById('tabShamsi').classList.toggle('active', which === 'shamsi');
+    document.getElementById('gregPicker').style.display = (which === 'greg') ? '' : 'none';
+    document.getElementById('shamsiPicker').style.display = (which === 'shamsi') ? '' : 'none';
+}
 
-        gDay.innerHTML = '';
-        gMonth.innerHTML = '';
-        sDay.innerHTML = '';
-        sMonth.innerHTML = '';
+document.addEventListener('DOMContentLoaded', function() {
+    const gInputs = ['gDay', 'gMonth', 'gYear'];
+    const sInputs = ['sDay', 'sMonth', 'sYear'];
 
-        for (let i = 1; i <= 31; i++) {
-            gDay.innerHTML += `<option value="${i}">${i}</option>`;
-            sDay.innerHTML += `<option value="${i}">${i}</option>`;
-        }
-        for (let i = 1; i <= 12; i++) {
-            gMonth.innerHTML += `<option value="${i}">${GREG_MONTHS[i-1]} (${i})</option>`;
-            sMonth.innerHTML += `<option value="${i}">${SHAMSI_MONTHS[i-1]} (${i})</option>`;
-        }
-    }
-
-    function setGregorian(gy, gm, gd) {
-        document.getElementById('gDay').value = gd;
-        document.getElementById('gMonth').value = gm;
-        document.getElementById('gYear').value = gy;
-    }
-    function setShamsi(gy, gm, gd) {
-        const s = gregToShamsi(gy, gm, gd);
-        document.getElementById('sDay').value = s.day;
-        document.getElementById('sMonth').value = s.month;
-        document.getElementById('sYear').value = s.year;
-    }
-
-    function switchCalendar(which) {
-        currentCalendar = which;
-        document.getElementById('tabGreg').classList.toggle('active', which === 'greg');
-        document.getElementById('tabShamsi').classList.toggle('active', which === 'shamsi');
-        document.getElementById('gregPicker').style.display = (which === 'greg') ? '' : 'none';
-        document.getElementById('shamsiPicker').style.display = (which === 'shamsi') ? '' : 'none';
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        const gInputs = ['gDay', 'gMonth', 'gYear'];
-        const sInputs = ['sDay', 'sMonth', 'sYear'];
-
-        gInputs.forEach(id => {
-            document.getElementById(id).addEventListener('input', function() {
-                if (currentCalendar !== 'greg') return;
-                const gy = parseInt(document.getElementById('gYear').value, 10);
-                const gm = parseInt(document.getElementById('gMonth').value, 10);
-                const gd = parseInt(document.getElementById('gDay').value, 10);
-                if (gy && gm && gd) {
-                    const s = gregToShamsi(gy, gm, gd);
+    gInputs.forEach(id => {
+        document.getElementById(id).addEventListener('input', function() {
+            if (currentCalendar !== 'greg') return;
+            const gy = parseInt(document.getElementById('gYear').value, 10);
+            const gm = parseInt(document.getElementById('gMonth').value, 10);
+            const gd = parseInt(document.getElementById('gDay').value, 10);
+            if (gy && gm && gd && gy >= 1900 && gy <= 2200) {
+                const s = gregToShamsi(gy, gm, gd);
+                if (s) {
                     document.getElementById('sDay').value = s.day;
                     document.getElementById('sMonth').value = s.month;
                     document.getElementById('sYear').value = s.year;
-                    updatePreviews();
                 }
-            });
-        });
-
-        sInputs.forEach(id => {
-            document.getElementById(id).addEventListener('input', function() {
-                if (currentCalendar !== 'shamsi') return;
-                const sy = parseInt(document.getElementById('sYear').value, 10);
-                const sm = parseInt(document.getElementById('sMonth').value, 10);
-                const sd = parseInt(document.getElementById('sDay').value, 10);
-                if (sy && sm && sd) {
-                    const g = shamsiToGregorian(sy, sm, sd);
-                    if (g.year) {
-                        document.getElementById('gDay').value = g.day;
-                        document.getElementById('gMonth').value = g.month;
-                        document.getElementById('gYear').value = g.year;
-                        updatePreviews();
-                    }
-                }
-            });
-        });
-
-        const mainInput = document.getElementById('paymentDateInput');
-        if (mainInput) {
-            mainInput.addEventListener('change', updateShamsiShortPreview);
-            mainInput.addEventListener('input', updateShamsiShortPreview);
-        }
-
-        // Fill Shamsi dates in the payments table
-        document.querySelectorAll('.shamsi-date').forEach(el => {
-            const greg = el.getAttribute('data-greg');
-            if (greg) {
-                const parts = greg.split('-');
-                if (parts.length === 3) {
-                    const s = gregToShamsi(parseInt(parts[0],10), parseInt(parts[1],10), parseInt(parts[2],10));
-                    el.textContent = `(${s.year}/${pad2(s.month)}/${pad2(s.day)} شمسي)`;
-                }
+                updatePreviews();
             }
         });
-
-        updateShamsiShortPreview();
     });
 
-    function updatePreviews() {
-        const gy = parseInt(document.getElementById('gYear').value, 10);
-        const gm = parseInt(document.getElementById('gMonth').value, 10);
-        const gd = parseInt(document.getElementById('gDay').value, 10);
-        const sy = parseInt(document.getElementById('sYear').value, 10);
-        const sm = parseInt(document.getElementById('sMonth').value, 10);
-        const sd = parseInt(document.getElementById('sDay').value, 10);
+    sInputs.forEach(id => {
+        document.getElementById(id).addEventListener('input', function() {
+            if (currentCalendar !== 'shamsi') return;
+            const sy = parseInt(document.getElementById('sYear').value, 10);
+            const sm = parseInt(document.getElementById('sMonth').value, 10);
+            const sd = parseInt(document.getElementById('sDay').value, 10);
+            if (sy && sm && sd && sy >= 1300 && sy <= 1500) {
+                const g = shamsiToGregorian(sy, sm, sd);
+                if (g) {
+                    document.getElementById('gDay').value = g.day;
+                    document.getElementById('gMonth').value = g.month;
+                    document.getElementById('gYear').value = g.year;
+                }
+                updatePreviews();
+            }
+        });
+    });
 
-        if (gy && gm && gd) {
-            document.getElementById('previewGreg').textContent = `${gy}-${pad2(gm)}-${pad2(gd)}`;
-        }
-        if (sy && sm && sd) {
-            document.getElementById('previewShamsi').textContent = `${sy}-${pad2(sm)}-${pad2(sd)} (${SHAMSI_MONTHS[sm-1]})`;
-        }
+    const mainInput = document.getElementById('paymentDateInput');
+    if (mainInput) {
+        mainInput.addEventListener('change', updateShamsiShortPreview);
+        mainInput.addEventListener('input', updateShamsiShortPreview);
     }
 
-    function updateShamsiShortPreview() {
-        const input = document.getElementById('paymentDateInput');
-        const preview = document.getElementById('shamsiPreview');
-        if (!input || !preview) return;
-        if (!input.value) { preview.textContent = '—'; return; }
-
-        const parts = input.value.split('-');
-        if (parts.length !== 3) return;
-        const s = gregToShamsi(parseInt(parts[0],10), parseInt(parts[1],10), parseInt(parts[2],10));
-        preview.textContent = `شمسي: ${s.year}/${pad2(s.month)}/${pad2(s.day)} (${SHAMSI_MONTHS[s.month-1]})`;
-    }
-
-    function applyDate() {
-        const gy = parseInt(document.getElementById('gYear').value, 10);
-        const gm = parseInt(document.getElementById('gMonth').value, 10);
-        const gd = parseInt(document.getElementById('gDay').value, 10);
-
-        if (!gy || !gm || !gd) {
-            alert('مهرباني وکړئ سمه نېټه ولیکئ');
+    // Fill Shamsi dates in the payments table
+    document.querySelectorAll('.shamsi-date').forEach(el => {
+        const greg = el.getAttribute('data-greg');
+        const parsed = parseGregDateSafe(greg);
+        if (!parsed) {
+            el.textContent = '';
             return;
         }
+        const s = gregToShamsi(parsed.y, parsed.m, parsed.d);
+        if (!s) {
+            el.textContent = '';
+            return;
+        }
+        el.textContent = `(${s.year}/${pad2(s.month)}/${pad2(s.day)} شمسي)`;
+    });
 
-        const input = document.getElementById('paymentDateInput');
-        input.value = formatGregDate(gy, gm, gd);
-        input.dispatchEvent(new Event('change'));
-        updateShamsiShortPreview();
-        closeDateConverter();
+    updateShamsiShortPreview();
+});
+
+function updatePreviews() {
+    const gy = parseInt(document.getElementById('gYear').value, 10);
+    const gm = parseInt(document.getElementById('gMonth').value, 10);
+    const gd = parseInt(document.getElementById('gDay').value, 10);
+    const sy = parseInt(document.getElementById('sYear').value, 10);
+    const sm = parseInt(document.getElementById('sMonth').value, 10);
+    const sd = parseInt(document.getElementById('sDay').value, 10);
+
+    const previewGreg = document.getElementById('previewGreg');
+    const previewShamsi = document.getElementById('previewShamsi');
+
+    if (gy && gm && gd && gy >= 1900 && gy <= 2200) {
+        previewGreg.textContent = `${gy}-${pad2(gm)}-${pad2(gd)}`;
+    } else {
+        previewGreg.textContent = '—';
     }
 
-    document.getElementById('dateModal')?.addEventListener('click', function(e) {
-        if (e.target === this) closeDateConverter();
-    });
+    if (sy && sm && sd && sy >= 1300 && sy <= 1500 && sm >= 1 && sm <= 12) {
+        previewShamsi.textContent = `${sy}-${pad2(sm)}-${pad2(sd)} (${SHAMSI_MONTHS[sm-1]})`;
+    } else {
+        previewShamsi.textContent = '—';
+    }
+}
+
+function updateShamsiShortPreview() {
+    const input = document.getElementById('paymentDateInput');
+    const preview = document.getElementById('shamsiPreview');
+    if (!input || !preview) return;
+
+    const parsed = parseGregDateSafe(input.value);
+    if (!parsed) {
+        preview.textContent = '—';
+        return;
+    }
+    const s = gregToShamsi(parsed.y, parsed.m, parsed.d);
+    if (!s) {
+        preview.textContent = '—';
+        return;
+    }
+    preview.textContent = `شمسي: ${s.year}/${pad2(s.month)}/${pad2(s.day)} (${SHAMSI_MONTHS[s.month-1]})`;
+}
+
+function applyDate() {
+    const gy = parseInt(document.getElementById('gYear').value, 10);
+    const gm = parseInt(document.getElementById('gMonth').value, 10);
+    const gd = parseInt(document.getElementById('gDay').value, 10);
+
+    if (!gy || !gm || !gd || gy < 1900 || gy > 2200 || gm < 1 || gm > 12 || gd < 1 || gd > 31) {
+        alert('مهرباني وکړئ سمه نېټه ولیکئ');
+        return;
+    }
+
+    const input = document.getElementById('paymentDateInput');
+    input.value = formatGregDate(gy, gm, gd);
+    input.dispatchEvent(new Event('change'));
+    updateShamsiShortPreview();
+    closeDateConverter();
+}
+
+document.getElementById('dateModal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeDateConverter();
+});
 </script>
 
 </body>
