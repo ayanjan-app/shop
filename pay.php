@@ -34,20 +34,27 @@ if (isset($_SESSION['flash_error'])) {
 }
 
 /* ============================================================
-   PHP: Accurate Shamsi ⇄ Gregorian (Kuwaiti algorithm)
-   Used to convert the incoming Shamsi date → Gregorian for DB
+   PHP: Accurate Shamsi (Afghan/Persian) ⇄ Gregorian
+   Kuwaiti algorithm (jalali) — matches JS version
    ============================================================ */
 function phpDiv($a, $b) { return intval($a / $b); }
 function phpMod($a, $b) { return $a - intval($a / $b) * $b; }
 
+// Shamsi (Jalali) → Gregorian
 function shamsiToGregorianPHP($jy, $jm, $jd) {
     $jy = (int)$jy; $jm = (int)$jm; $jd = (int)$jd;
     if ($jy < 1300 || $jy > 1500 || $jm < 1 || $jm > 12 || $jd < 1 || $jd > 31) return null;
 
     $gy = ($jy <= 979) ? 621 : 1600;
     $jy -= ($jy <= 979) ? 0 : 979;
-    $days = (365 * $jy) + (phpDiv($jy, 33) * 8) + phpDiv(phpMod($jy, 33) + 3, 4) + 78 + $jd
+
+    $days = (365 * $jy)
+          + (phpDiv($jy, 33) * 8)
+          + phpDiv(phpMod($jy, 33) + 3, 4)
+          + 78
+          + $jd
           + (($jm < 7) ? ($jm - 1) * 31 : (($jm - 7) * 30) + 186);
+
     $gy2 = ($days > 79) ? $gy + 1 : $gy;
     $days -= ($days > 79) ? 79 : -1 * ($gy2 - $gy) * 365;
 
@@ -55,24 +62,91 @@ function shamsiToGregorianPHP($jy, $jm, $jd) {
     $guard = 0;
     while ($guard++ < 400) {
         $isLeap = (($curY % 4 === 0) && ($curY % 100 !== 0 || $curY % 400 === 0));
-        $leap = $isLeap ? 366 : 365;
-        if ($days < $leap) break;
-        $days -= $leap;
+        $yearDays = $isLeap ? 366 : 365;
+        if ($days < $yearDays) break;
+        $days -= $yearDays;
         $curY++;
     }
-    $g_d_m = [0,31,28,31,30,31,30,31,31,30,31,30,31];
+
+    $g_d_m = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     $isLeap = (($curY % 4 === 0) && ($curY % 100 !== 0 || $curY % 400 === 0));
+    if ($isLeap) $g_d_m[2] = 29;
+
     $gm = 1;
     while ($gm <= 12) {
         $dim = $g_d_m[$gm];
-        if ($gm === 2 && $isLeap) $dim = 29;
         if ($days < $dim) break;
         $days -= $dim;
         $gm++;
     }
     $gd = $days + 1;
+
     if ($curY < 1900 || $curY > 2200 || $gm < 1 || $gm > 12 || $gd < 1 || $gd > 31) return null;
     return ['year' => $curY, 'month' => $gm, 'day' => $gd];
+}
+
+// Gregorian → Shamsi (Jalali)
+function gregToShamsiPHP($gy, $gm, $gd) {
+    $gy = (int)$gy; $gm = (int)$gm; $gd = (int)$gd;
+    if ($gy < 1900 || $gy > 2200 || $gm < 1 || $gm > 12 || $gd < 1 || $gd > 31) return null;
+
+    $jy = ($gy <= 1600) ? 0 : 979;
+    $gy -= ($gy <= 1600) ? 621 : 1600;
+    $gy2 = ($gm > 2) ? ($gy + 1) : $gy;
+
+    $days = (365 * $gy)
+          + phpDiv($gy2 + 3, 4)
+          - phpDiv($gy2 + 99, 100)
+          + phpDiv($gy2 + 399, 400)
+          - 80
+          + $gd
+          + [0,31,59,90,120,151,181,212,243,273,304,334][$gm - 1];
+
+    $jy += 1595;
+
+    $j_days = -1 * ($jy * 365)
+            + phpDiv($jy, 33) * 8
+            + phpDiv(phpMod($jy, 33) + 3, 4)
+            + 78
+            + $days;
+
+    if ($j_days < 0) return null;
+
+    $j_np = phpDiv($j_days, 12053);
+    $j_days %= 12053;
+    $jy += 33 * $j_np;
+    $jy += 4 * phpDiv($j_days, 1461);
+    $j_days %= 1461;
+
+    if ($j_days > 365) {
+        $jy += phpDiv($j_days - 1, 365);
+        $j_days = ($j_days - 1) % 365;
+    }
+
+    if ($j_days < 186) {
+        $jm = 1 + phpDiv($j_days, 31);
+        $jd = 1 + phpMod($j_days, 31);
+    } else {
+        $jm = 7 + phpDiv($j_days - 186, 30);
+        $jd = 1 + phpMod($j_days - 186, 30);
+    }
+
+    if ($jy < 1300 || $jy > 1500 || $jm < 1 || $jm > 12 || $jd < 1 || $jd > 31) return null;
+    return ['year' => $jy, 'month' => $jm, 'day' => $jd];
+}
+
+// Afghan month names
+$SHAMSI_MONTHS_PHP = ['حمل','ثور','جوزا','سرطان','اسد','سنبله','میزان','عقرب','قوس','جدي','دلو','حوت'];
+
+/* ============================================================
+   TODAY'S SHAMSI DATE (default for form)
+   ============================================================ */
+$gy = (int)date('Y');
+$gm = (int)date('n');
+$gd = (int)date('j');
+$todayShamsi = gregToShamsiPHP($gy, $gm, $gd);
+if (!$todayShamsi) {
+    $todayShamsi = ['year' => 1400, 'month' => 1, 'day' => 1];
 }
 
 // =========================
@@ -231,7 +305,12 @@ if (isset($_POST['add_payment'])) {
 
     // Convert Shamsi → Gregorian for DB
     $greg = shamsiToGregorianPHP($shamsi_year, $shamsi_month, $shamsi_day);
-    $payment_date = $greg ? sprintf('%04d-%02d-%02d', $greg['year'], $greg['month'], $greg['day']) : '';
+    if (!$greg) {
+        $_SESSION['flash_error'] = "نېټه سمه نه ده — شمسي نېټه بېرته وګورئ";
+        header("Location: " . strtok($_SERVER["REQUEST_URI"], '?'));
+        exit();
+    }
+    $payment_date = sprintf('%04d-%02d-%02d', $greg['year'], $greg['month'], $greg['day']);
 
     $allowed_currencies = ['USD', 'AFN'];
 
@@ -243,9 +322,6 @@ if (isset($_POST['add_payment'])) {
         $hasError = true;
     } elseif ($amount === '' || floatval($amount) <= 0) {
         $_SESSION['flash_error'] = "اندازه باید له صفر څخه زیاته وي";
-        $hasError = true;
-    } elseif (empty($payment_date)) {
-        $_SESSION['flash_error'] = "نېټه سمه نه ده";
         $hasError = true;
     }
 
@@ -412,47 +488,6 @@ if ($salesResult) {
         $sales_list[] = $s;
     }
 }
-
-// Today's Shamsi date for default form values
-$todayGreg = getdate();
-$gy = $todayGreg['year']; $gm = $todayGreg['mon']; $gd = $todayGreg['mday'];
-
-// Inline Shamsi conversion for default values
-function gregToShamsiPHP($gy, $gm, $gd) {
-    $gy = (int)$gy; $gm = (int)$gm; $gd = (int)$gd;
-    if ($gy < 1900 || $gy > 2200 || $gm < 1 || $gm > 12 || $gd < 1 || $gd > 31) return null;
-
-    $jy = ($gy <= 1600) ? 0 : 979;
-    $gy -= ($gy <= 1600) ? 621 : 1600;
-    $gy2 = ($gm > 2) ? ($gy + 1) : $gy;
-    $days = (365 * $gy) + phpDiv($gy2 + 3, 4) - phpDiv($gy2 + 99, 100) + phpDiv($gy2 + 399, 400)
-          - 80 + $gd + [0,31,59,90,120,151,181,212,243,273,304,334][$gm - 1];
-    $jy += 1595;
-    $j_days = -1 * ($jy * 365) + phpDiv($jy, 33) * 8 + phpDiv(phpMod($jy, 33) + 3, 4) + 78 + $days;
-    if ($j_days < 0) return null;
-    $j_np = phpDiv($j_days, 12053);
-    $j_days %= 12053;
-    $jy += 33 * $j_np;
-    $jy += 4 * phpDiv($j_days, 1461);
-    $j_days %= 1461;
-    if ($j_days > 365) {
-        $jy += phpDiv($j_days - 1, 365);
-        $j_days = ($j_days - 1) % 365;
-    }
-    if ($j_days < 186) {
-        $jm = 1 + phpDiv($j_days, 31);
-        $jd = 1 + phpMod($j_days, 31);
-    } else {
-        $jm = 7 + phpDiv($j_days - 186, 30);
-        $jd = 1 + phpMod($j_days - 186, 30);
-    }
-    return ['year' => $jy, 'month' => $jm, 'day' => $jd];
-}
-
-$todayShamsi = gregToShamsiPHP($gy, $gm, $gd) ?: ['year' => 1400, 'month' => 1, 'day' => 1];
-
-// Afghan month names
-$SHAMSI_MONTHS_PHP = ['حمل','ثور','جوزا','سرطان','اسد','سنبله','میزان','عقرب','قوس','جدي','دلو','حوت'];
 ?>
 <!DOCTYPE html>
 <html lang="ps" dir="rtl">
@@ -955,7 +990,6 @@ $SHAMSI_MONTHS_PHP = ['حمل','ثور','جوزا','سرطان','اسد','سنب
         .shamsi-hint i { color: var(--accent-color); }
         .shamsi-hint strong { color: var(--primary-color); }
 
-        /* Shamsi date display in table */
         .shamsi-date-display {
             font-weight: 700;
             color: var(--primary-color);
@@ -1214,7 +1248,7 @@ $SHAMSI_MONTHS_PHP = ['حمل','ثور','جوزا','سرطان','اسد','سنب
                     <input type="number" name="amount" id="amountInput" step="0.01" placeholder="0.00" required>
                 </div>
 
-                <!-- ===== SHAMSI (AFGHAN) DATE PICKER ===== -->
+                <!-- ===== SHAMSI (AFGHAN) DATE PICKER — defaults to TODAY ===== -->
                 <div class="form-group">
                     <label><i class="fas fa-calendar"></i> نېټه (شمسي / افغاني) *</label>
                     <div class="shamsi-picker">
@@ -1331,7 +1365,6 @@ $SHAMSI_MONTHS_PHP = ['حمل','ثور','جوزا','سرطان','اسد','سنب
                     <tbody>
                         <?php if (mysqli_num_rows($result) > 0): ?>
                             <?php while ($row = mysqli_fetch_assoc($result)): 
-                                // Convert stored Gregorian date to Shamsi for display
                                 $shamsiDisplay = '—';
                                 $monthName = '';
                                 if (!empty($row['payment_date']) && $row['payment_date'] !== '0000-00-00') {
@@ -1505,7 +1538,7 @@ $SHAMSI_MONTHS_PHP = ['حمل','ثور','جوزا','سرطان','اسد','سنب
         });
     }
 
-    // ===== Compress all file inputs in the payment form on submit =====
+    // ===== Compress all file inputs on submit =====
     (function() {
         const form = document.getElementById('paymentForm');
         const submitBtn = document.getElementById('paymentSubmitBtn');
