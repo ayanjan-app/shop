@@ -33,6 +33,48 @@ if (isset($_SESSION['flash_error'])) {
     unset($_SESSION['flash_error']);
 }
 
+/* ============================================================
+   PHP: Accurate Shamsi ⇄ Gregorian (Kuwaiti algorithm)
+   Used to convert the incoming Shamsi date → Gregorian for DB
+   ============================================================ */
+function phpDiv($a, $b) { return intval($a / $b); }
+function phpMod($a, $b) { return $a - intval($a / $b) * $b; }
+
+function shamsiToGregorianPHP($jy, $jm, $jd) {
+    $jy = (int)$jy; $jm = (int)$jm; $jd = (int)$jd;
+    if ($jy < 1300 || $jy > 1500 || $jm < 1 || $jm > 12 || $jd < 1 || $jd > 31) return null;
+
+    $gy = ($jy <= 979) ? 621 : 1600;
+    $jy -= ($jy <= 979) ? 0 : 979;
+    $days = (365 * $jy) + (phpDiv($jy, 33) * 8) + phpDiv(phpMod($jy, 33) + 3, 4) + 78 + $jd
+          + (($jm < 7) ? ($jm - 1) * 31 : (($jm - 7) * 30) + 186);
+    $gy2 = ($days > 79) ? $gy + 1 : $gy;
+    $days -= ($days > 79) ? 79 : -1 * ($gy2 - $gy) * 365;
+
+    $curY = $gy2;
+    $guard = 0;
+    while ($guard++ < 400) {
+        $isLeap = (($curY % 4 === 0) && ($curY % 100 !== 0 || $curY % 400 === 0));
+        $leap = $isLeap ? 366 : 365;
+        if ($days < $leap) break;
+        $days -= $leap;
+        $curY++;
+    }
+    $g_d_m = [0,31,28,31,30,31,30,31,31,30,31,30,31];
+    $isLeap = (($curY % 4 === 0) && ($curY % 100 !== 0 || $curY % 400 === 0));
+    $gm = 1;
+    while ($gm <= 12) {
+        $dim = $g_d_m[$gm];
+        if ($gm === 2 && $isLeap) $dim = 29;
+        if ($days < $dim) break;
+        $days -= $dim;
+        $gm++;
+    }
+    $gd = $days + 1;
+    if ($curY < 1900 || $curY > 2200 || $gm < 1 || $gm > 12 || $gd < 1 || $gd > 31) return null;
+    return ['year' => $curY, 'month' => $gm, 'day' => $gd];
+}
+
 // =========================
 // SERVER-SIDE IMAGE COMPRESSION (GD)
 // =========================
@@ -171,6 +213,7 @@ if (isset($_GET['delete_id'])) {
 
 // =========================
 // ADD PAYMENT (POST → redirect)
+// Shamsi date received from form → converted to Gregorian → stored
 // =========================
 if (isset($_POST['add_payment'])) {
     $client_id       = intval($_POST['client_id'] ?? 0);
@@ -178,11 +221,17 @@ if (isset($_POST['add_payment'])) {
     $hawala_number   = trim($_POST['hawala_number'] ?? '');
     $currency        = trim($_POST['currency'] ?? '');
     $amount          = trim($_POST['amount'] ?? '');
-    $payment_date    = trim($_POST['payment_date'] ?? '');
+    $shamsi_day      = intval($_POST['shamsi_day'] ?? 0);
+    $shamsi_month    = intval($_POST['shamsi_month'] ?? 0);
+    $shamsi_year     = intval($_POST['shamsi_year'] ?? 0);
     $note            = trim($_POST['note'] ?? '');
     $receiptPicture  = null;
     $notebookPicture = null;
     $hasError        = false;
+
+    // Convert Shamsi → Gregorian for DB
+    $greg = shamsiToGregorianPHP($shamsi_year, $shamsi_month, $shamsi_day);
+    $payment_date = $greg ? sprintf('%04d-%02d-%02d', $greg['year'], $greg['month'], $greg['day']) : '';
 
     $allowed_currencies = ['USD', 'AFN'];
 
@@ -196,11 +245,11 @@ if (isset($_POST['add_payment'])) {
         $_SESSION['flash_error'] = "اندازه باید له صفر څخه زیاته وي";
         $hasError = true;
     } elseif (empty($payment_date)) {
-        $_SESSION['flash_error'] = "نېټه اړینه ده";
+        $_SESSION['flash_error'] = "نېټه سمه نه ده";
         $hasError = true;
     }
 
-    // ===== RECEIPT PICTURE (with compression) =====
+    // ===== RECEIPT PICTURE =====
     if (!$hasError && isset($_FILES['receipt_picture']) && $_FILES['receipt_picture']['error'] === UPLOAD_ERR_OK) {
         $allowed_ext = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         $ext = strtolower(pathinfo($_FILES['receipt_picture']['name'], PATHINFO_EXTENSION));
@@ -213,7 +262,7 @@ if (isset($_POST['add_payment'])) {
         }
     }
 
-    // ===== NOTEBOOK PICTURE (with compression) =====
+    // ===== NOTEBOOK PICTURE =====
     if (!$hasError && isset($_FILES['notebook_picture']) && $_FILES['notebook_picture']['error'] === UPLOAD_ERR_OK) {
         $allowed_ext = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         $ext = strtolower(pathinfo($_FILES['notebook_picture']['name'], PATHINFO_EXTENSION));
@@ -248,7 +297,7 @@ if (isset($_POST['add_payment'])) {
 }
 
 // =========================
-// CLIENT BALANCES (for summary table)
+// CLIENT BALANCES
 // =========================
 $clients_balances = [];
 $balSql = "
@@ -260,22 +309,10 @@ $balSql = "
         COALESCE(inv_afn.total, 0) AS afn_invoiced,
         COALESCE(pay_afn.total, 0) AS afn_paid
     FROM clients c
-    LEFT JOIN (
-        SELECT client_id, SUM(total_amount) AS total 
-        FROM sales WHERE currency = 'USD' GROUP BY client_id
-    ) inv_usd ON c.id = inv_usd.client_id
-    LEFT JOIN (
-        SELECT client_id, SUM(amount) AS total 
-        FROM client_payments WHERE currency = 'USD' GROUP BY client_id
-    ) pay_usd ON c.id = pay_usd.client_id
-    LEFT JOIN (
-        SELECT client_id, SUM(total_amount) AS total 
-        FROM sales WHERE currency = 'AFN' GROUP BY client_id
-    ) inv_afn ON c.id = inv_afn.client_id
-    LEFT JOIN (
-        SELECT client_id, SUM(amount) AS total 
-        FROM client_payments WHERE currency = 'AFN' GROUP BY client_id
-    ) pay_afn ON c.id = pay_afn.client_id
+    LEFT JOIN (SELECT client_id, SUM(total_amount) AS total FROM sales WHERE currency = 'USD' GROUP BY client_id) inv_usd ON c.id = inv_usd.client_id
+    LEFT JOIN (SELECT client_id, SUM(amount) AS total FROM client_payments WHERE currency = 'USD' GROUP BY client_id) pay_usd ON c.id = pay_usd.client_id
+    LEFT JOIN (SELECT client_id, SUM(total_amount) AS total FROM sales WHERE currency = 'AFN' GROUP BY client_id) inv_afn ON c.id = inv_afn.client_id
+    LEFT JOIN (SELECT client_id, SUM(amount) AS total FROM client_payments WHERE currency = 'AFN' GROUP BY client_id) pay_afn ON c.id = pay_afn.client_id
     ORDER BY c.full_name ASC
 ";
 $balResult = $conn->query($balSql);
@@ -299,7 +336,7 @@ foreach ($clients_balances as $cb) {
 }
 
 // =========================
-// FILTER (for payments table)
+// FILTER
 // =========================
 $filter = $_GET['filter'] ?? 'all';
 $where = "";
@@ -338,7 +375,7 @@ $result = mysqli_query($conn, $sql);
 $record_count = mysqli_num_rows($result);
 
 // =========================
-// TOTALS (filtered)
+// TOTALS
 // =========================
 $total_usd = 0;
 $total_afn = 0;
@@ -352,7 +389,7 @@ if ($total_result) {
 }
 
 // =========================
-// CLIENTS (for dropdowns)
+// CLIENTS
 // =========================
 $clients_list = [];
 $clientResult = $conn->query("SELECT id, full_name FROM clients ORDER BY full_name ASC");
@@ -363,7 +400,7 @@ if ($clientResult) {
 }
 
 // =========================
-// SALES (for dropdown)
+// SALES
 // =========================
 $sales_list = [];
 $salesResult = $conn->query("SELECT s.id, s.invoice_number, s.currency, s.total_amount, s.client_id, c.full_name AS client_name 
@@ -376,7 +413,46 @@ if ($salesResult) {
     }
 }
 
-$today_date = date('Y-m-d');
+// Today's Shamsi date for default form values
+$todayGreg = getdate();
+$gy = $todayGreg['year']; $gm = $todayGreg['mon']; $gd = $todayGreg['mday'];
+
+// Inline Shamsi conversion for default values
+function gregToShamsiPHP($gy, $gm, $gd) {
+    $gy = (int)$gy; $gm = (int)$gm; $gd = (int)$gd;
+    if ($gy < 1900 || $gy > 2200 || $gm < 1 || $gm > 12 || $gd < 1 || $gd > 31) return null;
+
+    $jy = ($gy <= 1600) ? 0 : 979;
+    $gy -= ($gy <= 1600) ? 621 : 1600;
+    $gy2 = ($gm > 2) ? ($gy + 1) : $gy;
+    $days = (365 * $gy) + phpDiv($gy2 + 3, 4) - phpDiv($gy2 + 99, 100) + phpDiv($gy2 + 399, 400)
+          - 80 + $gd + [0,31,59,90,120,151,181,212,243,273,304,334][$gm - 1];
+    $jy += 1595;
+    $j_days = -1 * ($jy * 365) + phpDiv($jy, 33) * 8 + phpDiv(phpMod($jy, 33) + 3, 4) + 78 + $days;
+    if ($j_days < 0) return null;
+    $j_np = phpDiv($j_days, 12053);
+    $j_days %= 12053;
+    $jy += 33 * $j_np;
+    $jy += 4 * phpDiv($j_days, 1461);
+    $j_days %= 1461;
+    if ($j_days > 365) {
+        $jy += phpDiv($j_days - 1, 365);
+        $j_days = ($j_days - 1) % 365;
+    }
+    if ($j_days < 186) {
+        $jm = 1 + phpDiv($j_days, 31);
+        $jd = 1 + phpMod($j_days, 31);
+    } else {
+        $jm = 7 + phpDiv($j_days - 186, 30);
+        $jd = 1 + phpMod($j_days - 186, 30);
+    }
+    return ['year' => $jy, 'month' => $jm, 'day' => $jd];
+}
+
+$todayShamsi = gregToShamsiPHP($gy, $gm, $gd) ?: ['year' => 1400, 'month' => 1, 'day' => 1];
+
+// Afghan month names
+$SHAMSI_MONTHS_PHP = ['حمل','ثور','جوزا','سرطان','اسد','سنبله','میزان','عقرب','قوس','جدي','دلو','حوت'];
 ?>
 <!DOCTYPE html>
 <html lang="ps" dir="rtl">
@@ -465,7 +541,6 @@ $today_date = date('Y-m-d');
         .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
             outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(30,60,114,0.1);
         }
-        .form-group input[type="date"] { direction: ltr; text-align: right; }
         .form-group input[type="file"] { padding: 8px; }
 
         .compress-hint {
@@ -561,7 +636,7 @@ $today_date = date('Y-m-d');
         .search-row .form-group { flex: 1; min-width: 160px; margin-bottom: 0; }
         .search-row .btn { width: auto; padding: 12px 24px; }
 
-        /* ===== BALANCE SUMMARY TABLE: 300px height with scroll ===== */
+        /* ===== TABLE SCROLL ===== */
         .table-scroll {
             overflow-x: auto;
             overflow-y: auto;
@@ -570,22 +645,10 @@ $today_date = date('Y-m-d');
             border: 1px solid #e2e8f0;
             background: #ffffff;
         }
-        .table-scroll::-webkit-scrollbar {
-            width: 12px;
-            height: 12px;
-        }
-        .table-scroll::-webkit-scrollbar-track {
-            background: #f1f5f9;
-            border-radius: 8px;
-        }
-        .table-scroll::-webkit-scrollbar-thumb {
-            background: var(--accent-color);
-            border-radius: 8px;
-            border: 2px solid #f1f5f9;
-        }
-        .table-scroll::-webkit-scrollbar-thumb:hover {
-            background: #d4a017;
-        }
+        .table-scroll::-webkit-scrollbar { width: 12px; height: 12px; }
+        .table-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
+        .table-scroll::-webkit-scrollbar-thumb { background: var(--accent-color); border-radius: 8px; border: 2px solid #f1f5f9; }
+        .table-scroll::-webkit-scrollbar-thumb:hover { background: #d4a017; }
 
         /* ===== SUMMARY SEARCH BAR ===== */
         .summary-search-bar {
@@ -659,16 +722,9 @@ $today_date = date('Y-m-d');
             white-space: nowrap;
             border: none;
         }
-        .balance-table thead th.client-col {
-            background: #0f2a52;
-            text-align: right;
-        }
-        .balance-table thead th.afn-header {
-            background: #991b1b;
-        }
-        .balance-table thead th.usd-header {
-            background: #166534;
-        }
+        .balance-table thead th.client-col { background: #0f2a52; text-align: right; }
+        .balance-table thead th.afn-header { background: #991b1b; }
+        .balance-table thead th.usd-header { background: #166534; }
 
         .balance-table tbody td {
             padding: 12px 10px;
@@ -678,9 +734,7 @@ $today_date = date('Y-m-d');
             white-space: nowrap;
             font-weight: 600;
         }
-        .balance-table tbody td:first-child {
-            border-left: none;
-        }
+        .balance-table tbody td:first-child { border-left: none; }
         .balance-table tbody td.client-name-cell {
             text-align: right;
             font-weight: 700;
@@ -691,33 +745,14 @@ $today_date = date('Y-m-d');
             z-index: 2;
             box-shadow: -2px 0 5px rgba(0,0,0,0.05);
         }
-        .balance-table tbody tr:hover {
-            background: #f8fafc;
-        }
-        .balance-table tbody tr.row-has-unpaid {
-            background: #fffbeb;
-        }
-        .balance-table tbody tr.row-has-unpaid:hover {
-            background: #fef3c7;
-        }
-        .balance-table tbody tr.row-has-unpaid td.client-name-cell {
-            background: #fef3c7;
-        }
-        .balance-table .paid-value {
-            color: #16a34a;
-            font-weight: 700;
-        }
-        .balance-table .unpaid-value {
-            color: #d97706;
-            font-weight: 700;
-        }
-        .balance-table .unpaid-value.zero {
-            color: #16a34a;
-        }
-        .balance-table .invoiced-value {
-            color: var(--primary-color);
-            font-weight: 700;
-        }
+        .balance-table tbody tr:hover { background: #f8fafc; }
+        .balance-table tbody tr.row-has-unpaid { background: #fffbeb; }
+        .balance-table tbody tr.row-has-unpaid:hover { background: #fef3c7; }
+        .balance-table tbody tr.row-has-unpaid td.client-name-cell { background: #fef3c7; }
+        .balance-table .paid-value { color: #16a34a; font-weight: 700; }
+        .balance-table .unpaid-value { color: #d97706; font-weight: 700; }
+        .balance-table .unpaid-value.zero { color: #16a34a; }
+        .balance-table .invoiced-value { color: var(--primary-color); font-weight: 700; }
 
         .balance-table tfoot td {
             position: sticky;
@@ -754,7 +789,6 @@ $today_date = date('Y-m-d');
             margin-right: 4px;
         }
 
-        /* ===== BILL PRINT BUTTON ===== */
         .btn-bill-print {
             display: inline-flex;
             align-items: center;
@@ -779,9 +813,7 @@ $today_date = date('Y-m-d');
             transform: translateY(-2px);
             box-shadow: 0 6px 15px rgba(30,60,114,0.4);
         }
-        .btn-bill-print i {
-            font-size: 0.85rem;
-        }
+        .btn-bill-print i { font-size: 0.85rem; }
         .client-name-cell {
             display: flex;
             align-items: center;
@@ -804,21 +836,10 @@ $today_date = date('Y-m-d');
             border: 1px solid #e2e8f0;
             background: #ffffff;
         }
-        .table-wrapper::-webkit-scrollbar {
-            width: 10px;
-            height: 10px;
-        }
-        .table-wrapper::-webkit-scrollbar-track {
-            background: #f1f5f9;
-            border-radius: 8px;
-        }
-        .table-wrapper::-webkit-scrollbar-thumb {
-            background: var(--accent-color);
-            border-radius: 8px;
-        }
-        .table-wrapper::-webkit-scrollbar-thumb:hover {
-            background: #d4a017;
-        }
+        .table-wrapper::-webkit-scrollbar { width: 10px; height: 10px; }
+        .table-wrapper::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
+        .table-wrapper::-webkit-scrollbar-thumb { background: var(--accent-color); border-radius: 8px; }
+        .table-wrapper::-webkit-scrollbar-thumb:hover { background: #d4a017; }
 
         table {
             width: 100%;
@@ -826,14 +847,8 @@ $today_date = date('Y-m-d');
             font-size: 0.92rem;
             min-width: 900px;
         }
-        thead {
-            background: var(--primary-color);
-        }
-        thead th {
-            position: sticky;
-            top: 0;
-            z-index: 3;
-        }
+        thead { background: var(--primary-color); }
+        thead th { position: sticky; top: 0; z-index: 3; }
         th {
             padding: 14px 12px;
             text-align: right;
@@ -876,7 +891,6 @@ $today_date = date('Y-m-d');
         .total-box .total-value { font-size: 1.5rem; font-weight: 800; }
         @media (max-width: 480px) { .total-footer { grid-template-columns: 1fr; } }
 
-        /* ===== SUMMARY HINT BOX ===== */
         .summary-hint {
             background: #eff6ff;
             border: 2px dashed #93c5fd;
@@ -897,6 +911,68 @@ $today_date = date('Y-m-d');
         .image-modal img { max-width: 90vw; max-height: 85vh; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); border: 3px solid var(--accent-color); }
         .image-modal-close { position: absolute; top: 20px; right: 25px; background: var(--danger-color); color: white; border: none; width: 48px; height: 48px; border-radius: 50%; font-size: 1.3rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
+        /* ===== SHAMSI DATE PICKER (FORM) ===== */
+        .shamsi-picker {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1.3fr;
+            gap: 8px;
+        }
+        .shamsi-picker select, .shamsi-picker input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            background: var(--card-bg);
+            text-align: center;
+            font-weight: 700;
+            color: var(--primary-color);
+            min-height: 48px;
+        }
+        .shamsi-picker select:focus, .shamsi-picker input:focus {
+            outline: none; border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(30,60,114,0.1);
+        }
+        .shamsi-picker select {
+            -webkit-appearance: none !important;
+            appearance: none !important;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%231e3c72' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>") !important;
+            background-repeat: no-repeat !important;
+            background-position: left 10px center !important;
+            background-size: 14px !important;
+            padding-left: 30px !important;
+            cursor: pointer;
+        }
+        .shamsi-hint {
+            margin-top: 6px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .shamsi-hint i { color: var(--accent-color); }
+        .shamsi-hint strong { color: var(--primary-color); }
+
+        /* Shamsi date display in table */
+        .shamsi-date-display {
+            font-weight: 700;
+            color: var(--primary-color);
+            direction: rtl;
+            font-size: 0.92rem;
+        }
+        .shamsi-date-month {
+            display: inline-block;
+            background: #fef3c7;
+            color: #92400e;
+            padding: 1px 6px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            margin-right: 4px;
+        }
+
         @media (max-width: 768px) {
             .page-header h1 { font-size: 1.4rem; }
             .stat-info p { font-size: 1.15rem; }
@@ -906,124 +982,8 @@ $today_date = date('Y-m-d');
             .form-group select { width: 100% !important; font-size: 16px !important; }
             .balance-table tbody td, .balance-table thead th { font-size: 0.78rem; padding: 8px 6px; }
             .btn-bill-print { padding: 5px 8px; font-size: 0.7rem; }
+            .shamsi-picker { grid-template-columns: 1fr 1.6fr 1fr; }
         }
-
-        /* ===== DATE CONVERTER ===== */
-        .date-input-wrap {
-            position: relative;
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-        .date-input-wrap input[type="date"] {
-            flex: 1;
-        }
-        .btn-date-convert {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            padding: 12px 14px;
-            background: var(--accent-color);
-            color: var(--primary-color);
-            border: none;
-            border-radius: 10px;
-            font-size: 0.82rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: var(--transition);
-            font-family: inherit;
-            white-space: nowrap;
-            min-height: 48px;
-        }
-        .btn-date-convert:hover {
-            background: #d4a017;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 15px rgba(230,177,46,0.4);
-        }
-        .date-short {
-            font-size: 0.72rem;
-            color: var(--text-muted);
-            margin-top: 4px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        .date-short i { color: var(--accent-color); }
-
-        .shamsi-date {
-            display: block;
-            font-size: 0.78rem;
-            color: var(--text-muted);
-            margin-top: 2px;
-            direction: rtl;
-        }
-
-        .date-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(5px); }
-        .date-modal.active { display: flex; }
-        .date-modal-content {
-            background: #fff;
-            border-radius: var(--border-radius);
-            padding: 28px;
-            max-width: 460px;
-            width: 100%;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            border-top: 4px solid var(--accent-color);
-            animation: fadeIn 0.3s ease;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        .date-modal-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 2px solid #f1f5f9; }
-        .date-modal-header i { color: var(--accent-color); font-size: 1.4rem; }
-        .date-modal-header h2 { margin: 0; font-size: 1.15rem; color: var(--primary-color); font-weight: 700; }
-        .date-modal-header .close-x { margin-right: auto; background: #f1f5f9; border: none; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; color: var(--danger-color); font-size: 1rem; }
-        .date-modal-header .close-x:hover { background: #fee2e2; }
-
-        .calendar-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
-        .calendar-tabs button {
-            flex: 1;
-            padding: 10px;
-            border: 2px solid #e2e8f0;
-            background: #f8fafc;
-            color: var(--text-muted);
-            border-radius: 10px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: var(--transition);
-            font-family: inherit;
-            font-size: 0.9rem;
-        }
-        .calendar-tabs button.active { background: var(--primary-color); color: white; border-color: var(--primary-color); }
-
-        .date-picker-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
-        .date-picker-row select, .date-picker-row input {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            font-size: 0.95rem;
-            font-family: inherit;
-            background: #fff;
-            text-align: center;
-            font-weight: 600;
-            color: var(--primary-color);
-        }
-        .date-picker-row select:focus, .date-picker-row input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(30,60,114,0.1); }
-
-        .date-preview-box {
-            background: linear-gradient(135deg, #eff6ff, #f8fafc);
-            border: 2px dashed #93c5fd;
-            border-radius: 12px;
-            padding: 16px;
-            text-align: center;
-            margin-bottom: 18px;
-        }
-        .date-preview-box .label { font-size: 0.78rem; color: var(--text-muted); font-weight: 700; margin-bottom: 6px; }
-        .date-preview-box .value { font-size: 1.15rem; font-weight: 800; color: var(--primary-color); }
-        .date-preview-box .value + .label { margin-top: 14px; }
-
-        .date-modal-buttons { display: flex; gap: 12px; }
-        .date-modal-buttons .btn { flex: 1; }
     </style>
 </head>
 <body>
@@ -1254,17 +1214,34 @@ $today_date = date('Y-m-d');
                     <input type="number" name="amount" id="amountInput" step="0.01" placeholder="0.00" required>
                 </div>
 
+                <!-- ===== SHAMSI (AFGHAN) DATE PICKER ===== -->
                 <div class="form-group">
-                    <label><i class="fas fa-calendar"></i> نېټه *</label>
-                    <div class="date-input-wrap">
-                        <input type="date" name="payment_date" id="paymentDateInput" value="<?php echo $today_date; ?>" required>
-                        <button type="button" class="btn-date-convert" onclick="openDateConverter()">
-                            <i class="fas fa-exchange-alt"></i> شمسي
-                        </button>
+                    <label><i class="fas fa-calendar"></i> نېټه (شمسي / افغاني) *</label>
+                    <div class="shamsi-picker">
+                        <select name="shamsi_day" id="shamsiDay" required>
+                            <?php for ($d = 1; $d <= 31; $d++): ?>
+                                <option value="<?php echo $d; ?>" <?php echo ($d == $todayShamsi['day']) ? 'selected' : ''; ?>>
+                                    <?php echo $d; ?>
+                                </option>
+                            <?php endfor; ?>
+                        </select>
+
+                        <select name="shamsi_month" id="shamsiMonth" required>
+                            <?php for ($m = 1; $m <= 12; $m++): ?>
+                                <option value="<?php echo $m; ?>" <?php echo ($m == $todayShamsi['month']) ? 'selected' : ''; ?>>
+                                    <?php echo $SHAMSI_MONTHS_PHP[$m-1]; ?>
+                                </option>
+                            <?php endfor; ?>
+                        </select>
+
+                        <input type="number" name="shamsi_year" id="shamsiYear"
+                               min="1300" max="1500"
+                               value="<?php echo $todayShamsi['year']; ?>"
+                               required>
                     </div>
-                    <div class="date-short">
+                    <div class="shamsi-hint">
                         <i class="fas fa-info-circle"></i>
-                        <span id="shamsiPreview">—</span>
+                        <span>نننۍ افغاني نېټه: <strong><?php echo $todayShamsi['year']; ?>/<?php echo sprintf('%02d', $todayShamsi['month']); ?>/<?php echo sprintf('%02d', $todayShamsi['day']); ?></strong> (<?php echo $SHAMSI_MONTHS_PHP[$todayShamsi['month']-1]; ?>)</span>
                     </div>
                 </div>
 
@@ -1346,14 +1323,28 @@ $today_date = date('Y-m-d');
                             <th>فاکتور</th>
                             <th>ډول</th>
                             <th>اندازه</th>
-                            <th>نېټه</th>
+                            <th>نېټه (شمسي)</th>
                             <th>عکسونه</th>
                             <th>کړنې</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (mysqli_num_rows($result) > 0): ?>
-                            <?php while ($row = mysqli_fetch_assoc($result)): ?>
+                            <?php while ($row = mysqli_fetch_assoc($result)): 
+                                // Convert stored Gregorian date to Shamsi for display
+                                $shamsiDisplay = '—';
+                                $monthName = '';
+                                if (!empty($row['payment_date']) && $row['payment_date'] !== '0000-00-00') {
+                                    $parts = explode('-', $row['payment_date']);
+                                    if (count($parts) === 3) {
+                                        $s = gregToShamsiPHP((int)$parts[0], (int)$parts[1], (int)$parts[2]);
+                                        if ($s) {
+                                            $shamsiDisplay = sprintf('%04d/%02d/%02d', $s['year'], $s['month'], $s['day']);
+                                            $monthName = $SHAMSI_MONTHS_PHP[$s['month']-1];
+                                        }
+                                    }
+                                }
+                            ?>
                                 <tr>
                                     <td><span class="id-badge">#<?php echo $row['id']; ?></span></td>
                                     <td><?php echo htmlspecialchars($row['client_name'] ?? '—'); ?></td>
@@ -1372,8 +1363,10 @@ $today_date = date('Y-m-d');
                                     </td>
                                     <td class="amount-cell"><?php echo number_format($row['amount'], 2); ?></td>
                                     <td>
-                                        <?php echo htmlspecialchars($row['payment_date']); ?>
-                                        <span class="shamsi-date" data-greg="<?php echo htmlspecialchars($row['payment_date']); ?>"></span>
+                                        <span class="shamsi-date-display"><?php echo $shamsiDisplay; ?></span>
+                                        <?php if ($monthName): ?>
+                                            <span class="shamsi-date-month"><?php echo $monthName; ?></span>
+                                        <?php endif; ?>
                                     </td>
                                     <td>
                                         <?php if (!empty($row['receipt_picture']) && file_exists(__DIR__ . '/' . $row['receipt_picture'])): ?>
@@ -1442,59 +1435,9 @@ $today_date = date('Y-m-d');
     <img id="modalImage" src="" alt="عکس">
 </div>
 
-<!-- ===== DATE CONVERTER MODAL ===== -->
-<div class="date-modal" id="dateModal">
-    <div class="date-modal-content">
-        <div class="date-modal-header">
-            <i class="fas fa-calendar-alt"></i>
-            <h2>د نېټې کنورټر</h2>
-            <button class="close-x" onclick="closeDateConverter()"><i class="fas fa-times"></i></button>
-        </div>
-
-        <div class="calendar-tabs">
-            <button type="button" id="tabGreg" class="active" onclick="switchCalendar('greg')">میلادي</button>
-            <button type="button" id="tabShamsi" onclick="switchCalendar('shamsi')">شمسي (هجري)</button>
-        </div>
-
-        <!-- Gregorian Picker -->
-        <div id="gregPicker">
-            <div class="date-picker-row">
-                <select id="gDay"></select>
-                <select id="gMonth"></select>
-                <input type="number" id="gYear" min="1900" max="2200">
-            </div>
-        </div>
-
-        <!-- Shamsi Picker -->
-        <div id="shamsiPicker" style="display:none;">
-            <div class="date-picker-row">
-                <select id="sDay"></select>
-                <select id="sMonth"></select>
-                <input type="number" id="sYear" min="1300" max="1500">
-            </div>
-        </div>
-
-        <div class="date-preview-box">
-            <div class="label">میلادي نېټه</div>
-            <div class="value" id="previewGreg">—</div>
-            <div class="label">شمسي نېټه</div>
-            <div class="value" id="previewShamsi">—</div>
-        </div>
-
-        <div class="date-modal-buttons">
-            <button type="button" class="btn btn-reset" onclick="closeDateConverter()">
-                <i class="fas fa-times"></i> لغوه
-            </button>
-            <button type="button" class="btn btn-primary" onclick="applyDate()">
-                <i class="fas fa-check"></i> ومنل
-            </button>
-        </div>
-    </div>
-</div>
-
 <script>
     // ============================================
-    // IMAGE COMPRESSION - Compress to ~50KB before upload
+    // IMAGE COMPRESSION
     // ============================================
     async function compressImage(file, maxSizeKB = 50, maxWidth = 800, maxHeight = 800) {
         return new Promise((resolve, reject) => {
@@ -1595,7 +1538,6 @@ $today_date = date('Y-m-d');
                         const dt = new DataTransfer();
                         dt.items.add(compressed);
                         input.files = dt.files;
-                        console.log(`✅ ${input.name}: ${(original.size/1024).toFixed(1)}KB → ${(compressed.size/1024).toFixed(1)}KB`);
                     }
 
                     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> خوندي کیږي...';
@@ -1647,7 +1589,6 @@ $today_date = date('Y-m-d');
     const saleSelect = document.getElementById('saleSelect');
 
     let currentBalance = null;
-
     const AJAX_URL = window.location.pathname;
 
     function showError(msg) {
@@ -1683,21 +1624,16 @@ $today_date = date('Y-m-d');
             .then(response => response.text())
             .then(text => {
                 balanceLoading.classList.remove('active');
-
                 let data;
-                try {
-                    data = JSON.parse(text);
-                } catch (e) {
+                try { data = JSON.parse(text); }
+                catch (e) {
                     showError('Server did not return JSON.');
-                    console.error('Raw response:', text);
                     return;
                 }
-
                 if (!data.success) {
                     showError(data.message || 'Unknown error');
                     return;
                 }
-
                 currentBalance = data;
                 renderBalance(data, 0);
                 balanceBox.classList.add('active');
@@ -1731,19 +1667,9 @@ $today_date = date('Y-m-d');
 
         if (payAmount > 0) {
             if (isOverpaid) {
-                html += `
-                    <div class="balance-row overpaid">
-                        <span class="label">⚠️ اضافه تادیه</span>
-                        <span class="value">${Math.abs(remaining).toLocaleString('en-US', {minimumFractionDigits: 2})} ${currencySymbol}</span>
-                    </div>
-                `;
+                html += `<div class="balance-row overpaid"><span class="label">⚠️ اضافه تادیه</span><span class="value">${Math.abs(remaining).toLocaleString('en-US', {minimumFractionDigits: 2})} ${currencySymbol}</span></div>`;
             } else {
-                html += `
-                    <div class="balance-row remaining">
-                        <span class="label">✓ د تادیې وروسته پاتې</span>
-                        <span class="value">${remaining.toLocaleString('en-US', {minimumFractionDigits: 2})} ${currencySymbol}</span>
-                    </div>
-                `;
+                html += `<div class="balance-row remaining"><span class="label">✓ د تادیې وروسته پاتې</span><span class="value">${remaining.toLocaleString('en-US', {minimumFractionDigits: 2})} ${currencySymbol}</span></div>`;
             }
         }
 
@@ -1767,22 +1693,17 @@ $today_date = date('Y-m-d');
             const invCurrency = opt.dataset.currency;
             const invClient = opt.dataset.client;
 
-            if (invCurrency === 'USD' || invCurrency === 'AFN') {
-                currencySelect.value = invCurrency;
-            }
-            if (invClient) {
-                clientSelect.value = invClient;
-            }
+            if (invCurrency === 'USD' || invCurrency === 'AFN') currencySelect.value = invCurrency;
+            if (invClient) clientSelect.value = invClient;
             fetchBalance();
         });
     }
 
-    // ===== SEARCH IN CLIENT BALANCES TABLE =====
+    // ===== SEARCH IN CLIENT BALANCES =====
     function filterClientRows() {
         const searchValue = document.getElementById('clientSearchInput').value.toLowerCase().trim();
         const rows = document.querySelectorAll('#balanceTableBody tr.client-row');
         let visibleCount = 0;
-
         rows.forEach(row => {
             const name = row.getAttribute('data-client-name') || '';
             if (searchValue === '' || name.includes(searchValue)) {
@@ -1792,356 +1713,8 @@ $today_date = date('Y-m-d');
                 row.style.display = 'none';
             }
         });
-
         document.getElementById('visibleCount').textContent = visibleCount;
     }
-
-    /* ============================================================
-       Accurate Shamsi (Afghan/Persian) ⇄ Gregorian Converter
-       Based on the well-known Kuwaiti algorithm (jalali.js)
-       ============================================================ */
- /* ============================================================
-   Accurate Shamsi (Afghan/Persian) ⇄ Gregorian Converter
-   With strict validation & safe fallbacks
-   ============================================================ */
-const SHAMSI_MONTHS = ['حمل','ثور','جوزا','سرطان','اسد','سنبله','میزان','عقرب','قوس','جدي','دلو','حوت'];
-const GREG_MONTHS   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-let currentCalendar = 'greg';
-
-function div(a, b) { return ~~(a / b); }
-function mod(a, b) { return a - ~~(a / b) * b; }
-function pad2(n) { return String(n).padStart(2, '0'); }
-
-// Strict validation: returns {y,m,d} or null
-function parseGregDateSafe(str) {
-    if (!str || typeof str !== 'string') return null;
-    str = str.trim();
-    if (str === '' || str === '0000-00-00' || str.startsWith('0000')) return null;
-
-    // Accept YYYY-MM-DD or YYYY/MM/DD
-    const m = str.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
-    if (!m) return null;
-
-    const y = parseInt(m[1], 10);
-    const mo = parseInt(m[2], 10);
-    const d = parseInt(m[3], 10);
-
-    if (!y || !mo || !d) return null;
-    if (y < 1900 || y > 2200) return null;
-    if (mo < 1 || mo > 12) return null;
-    if (d < 1 || d > 31) return null;
-
-    return { y, m: mo, d };
-}
-
-// Gregorian → Shamsi (Jalali) - SAFE
-function gregToShamsi(gy, gm, gd) {
-    try {
-        gy = parseInt(gy, 10);
-        gm = parseInt(gm, 10);
-        gd = parseInt(gd, 10);
-        if (!gy || !gm || !gd || gy < 1900 || gy > 2200 || gm < 1 || gm > 12 || gd < 1 || gd > 31) {
-            return null;
-        }
-
-        let jy = (gy <= 1600) ? 0 : 979;
-        gy -= (gy <= 1600) ? 621 : 1600;
-        const gy2 = (gm > 2) ? (gy + 1) : gy;
-        let days = (365 * gy) +
-                   div((gy2 + 3), 4) -
-                   div((gy2 + 99), 100) +
-                   div((gy2 + 399), 400) -
-                   80 + gd + [0,31,59,90,120,151,181,212,243,273,304,334][gm - 1];
-        jy += 1595;
-        let j_days = -1 * (jy * 365) +
-                     div(jy, 33) * 8 +
-                     div(mod(jy, 33) + 3, 4) +
-                     78 + days;
-
-        if (j_days < 0) return null;
-
-        const j_np = div(j_days, 12053);
-        j_days %= 12053;
-        jy += 33 * j_np;
-        jy += 4 * div(j_days, 1461);
-        j_days %= 1461;
-        if (j_days > 365) {
-            jy += div(j_days - 1, 365);
-            j_days = (j_days - 1) % 365;
-        }
-
-        let jm, jd;
-        if (j_days < 186) {
-            jm = 1 + div(j_days, 31);
-            jd = 1 + mod(j_days, 31);
-        } else {
-            jm = 7 + div(j_days - 186, 30);
-            jd = 1 + mod(j_days - 186, 30);
-        }
-
-        if (!jy || !jm || !jd || jm < 1 || jm > 12 || jd < 1 || jd > 31) return null;
-        return { year: jy, month: jm, day: jd };
-    } catch (e) {
-        console.error('gregToShamsi error:', e);
-        return null;
-    }
-}
-
-// Shamsi (Jalali) → Gregorian - SAFE
-function shamsiToGregorian(jy, jm, jd) {
-    try {
-        jy = parseInt(jy, 10);
-        jm = parseInt(jm, 10);
-        jd = parseInt(jd, 10);
-        if (!jy || !jm || !jd || jy < 1300 || jy > 1500 || jm < 1 || jm > 12 || jd < 1 || jd > 31) {
-            return null;
-        }
-
-        let gy = (jy <= 979) ? 621 : 1600;
-        jy -= (jy <= 979) ? 0 : 979;
-        let days = (365 * jy) +
-                   (div(jy, 33) * 8) +
-                   div(mod(jy, 33) + 3, 4) +
-                   78 + jd +
-                   ((jm < 7) ? (jm - 1) * 31 : ((jm - 7) * 30) + 186);
-        const gy2 = (days > 79) ? gy + 1 : gy;
-        days -= (days > 79) ? 79 : -1 * (gy2 - gy) * 365;
-
-        let curY = gy2;
-        let guard = 0;
-        while (guard++ < 400) {
-            const leap = (curY % 4 === 0 && (curY % 100 !== 0 || curY % 400 === 0)) ? 366 : 365;
-            if (days < leap) break;
-            days -= leap;
-            curY++;
-        }
-
-        const g_d_m = [0,31,28,31,30,31,30,31,31,30,31,30,31];
-        const isLeap = (curY % 4 === 0 && (curY % 100 !== 0 || curY % 400 === 0));
-        let gm = 1;
-        while (gm <= 12) {
-            let dim = g_d_m[gm];
-            if (gm === 2 && isLeap) dim = 29;
-            if (days < dim) break;
-            days -= dim;
-            gm++;
-        }
-        const gd = days + 1;
-        if (!curY || !gm || !gd || gm < 1 || gm > 12 || gd < 1 || gd > 31) return null;
-        return { year: curY, month: gm, day: gd };
-    } catch (e) {
-        console.error('shamsiToGregorian error:', e);
-        return null;
-    }
-}
-
-function formatGregDate(gy, gm, gd) {
-    return `${gy}-${pad2(gm)}-${pad2(gd)}`;
-}
-
-function openDateConverter() {
-    const mainInput = document.getElementById('paymentDateInput');
-    let gy, gm, gd;
-
-    const parsed = parseGregDateSafe(mainInput.value);
-    if (parsed) {
-        gy = parsed.y; gm = parsed.m; gd = parsed.d;
-    } else {
-        const now = new Date();
-        gy = now.getFullYear();
-        gm = now.getMonth() + 1;
-        gd = now.getDate();
-    }
-
-    buildSelects();
-    setGregorian(gy, gm, gd);
-    setShamsi(gy, gm, gd);
-    switchCalendar('greg');
-    updatePreviews();
-
-    document.getElementById('dateModal').classList.add('active');
-    document.body.style.overflow = 'hidden';
-}
-function closeDateConverter() {
-    document.getElementById('dateModal').classList.remove('active');
-    document.body.style.overflow = '';
-}
-
-function buildSelects() {
-    const gDay = document.getElementById('gDay');
-    const gMonth = document.getElementById('gMonth');
-    const sDay = document.getElementById('sDay');
-    const sMonth = document.getElementById('sMonth');
-
-    gDay.innerHTML = '';
-    gMonth.innerHTML = '';
-    sDay.innerHTML = '';
-    sMonth.innerHTML = '';
-
-    for (let i = 1; i <= 31; i++) {
-        gDay.innerHTML += `<option value="${i}">${i}</option>`;
-        sDay.innerHTML += `<option value="${i}">${i}</option>`;
-    }
-    for (let i = 1; i <= 12; i++) {
-        gMonth.innerHTML += `<option value="${i}">${GREG_MONTHS[i-1]} (${i})</option>`;
-        sMonth.innerHTML += `<option value="${i}">${SHAMSI_MONTHS[i-1]} (${i})</option>`;
-    }
-}
-
-function setGregorian(gy, gm, gd) {
-    document.getElementById('gDay').value = gd;
-    document.getElementById('gMonth').value = gm;
-    document.getElementById('gYear').value = gy;
-}
-function setShamsi(gy, gm, gd) {
-    const s = gregToShamsi(gy, gm, gd);
-    if (!s) {
-        document.getElementById('sDay').value = 1;
-        document.getElementById('sMonth').value = 1;
-        document.getElementById('sYear').value = 1400;
-        return;
-    }
-    document.getElementById('sDay').value = s.day;
-    document.getElementById('sMonth').value = s.month;
-    document.getElementById('sYear').value = s.year;
-}
-
-function switchCalendar(which) {
-    currentCalendar = which;
-    document.getElementById('tabGreg').classList.toggle('active', which === 'greg');
-    document.getElementById('tabShamsi').classList.toggle('active', which === 'shamsi');
-    document.getElementById('gregPicker').style.display = (which === 'greg') ? '' : 'none';
-    document.getElementById('shamsiPicker').style.display = (which === 'shamsi') ? '' : 'none';
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    const gInputs = ['gDay', 'gMonth', 'gYear'];
-    const sInputs = ['sDay', 'sMonth', 'sYear'];
-
-    gInputs.forEach(id => {
-        document.getElementById(id).addEventListener('input', function() {
-            if (currentCalendar !== 'greg') return;
-            const gy = parseInt(document.getElementById('gYear').value, 10);
-            const gm = parseInt(document.getElementById('gMonth').value, 10);
-            const gd = parseInt(document.getElementById('gDay').value, 10);
-            if (gy && gm && gd && gy >= 1900 && gy <= 2200) {
-                const s = gregToShamsi(gy, gm, gd);
-                if (s) {
-                    document.getElementById('sDay').value = s.day;
-                    document.getElementById('sMonth').value = s.month;
-                    document.getElementById('sYear').value = s.year;
-                }
-                updatePreviews();
-            }
-        });
-    });
-
-    sInputs.forEach(id => {
-        document.getElementById(id).addEventListener('input', function() {
-            if (currentCalendar !== 'shamsi') return;
-            const sy = parseInt(document.getElementById('sYear').value, 10);
-            const sm = parseInt(document.getElementById('sMonth').value, 10);
-            const sd = parseInt(document.getElementById('sDay').value, 10);
-            if (sy && sm && sd && sy >= 1300 && sy <= 1500) {
-                const g = shamsiToGregorian(sy, sm, sd);
-                if (g) {
-                    document.getElementById('gDay').value = g.day;
-                    document.getElementById('gMonth').value = g.month;
-                    document.getElementById('gYear').value = g.year;
-                }
-                updatePreviews();
-            }
-        });
-    });
-
-    const mainInput = document.getElementById('paymentDateInput');
-    if (mainInput) {
-        mainInput.addEventListener('change', updateShamsiShortPreview);
-        mainInput.addEventListener('input', updateShamsiShortPreview);
-    }
-
-    // Fill Shamsi dates in the payments table
-    document.querySelectorAll('.shamsi-date').forEach(el => {
-        const greg = el.getAttribute('data-greg');
-        const parsed = parseGregDateSafe(greg);
-        if (!parsed) {
-            el.textContent = '';
-            return;
-        }
-        const s = gregToShamsi(parsed.y, parsed.m, parsed.d);
-        if (!s) {
-            el.textContent = '';
-            return;
-        }
-        el.textContent = `(${s.year}/${pad2(s.month)}/${pad2(s.day)} شمسي)`;
-    });
-
-    updateShamsiShortPreview();
-});
-
-function updatePreviews() {
-    const gy = parseInt(document.getElementById('gYear').value, 10);
-    const gm = parseInt(document.getElementById('gMonth').value, 10);
-    const gd = parseInt(document.getElementById('gDay').value, 10);
-    const sy = parseInt(document.getElementById('sYear').value, 10);
-    const sm = parseInt(document.getElementById('sMonth').value, 10);
-    const sd = parseInt(document.getElementById('sDay').value, 10);
-
-    const previewGreg = document.getElementById('previewGreg');
-    const previewShamsi = document.getElementById('previewShamsi');
-
-    if (gy && gm && gd && gy >= 1900 && gy <= 2200) {
-        previewGreg.textContent = `${gy}-${pad2(gm)}-${pad2(gd)}`;
-    } else {
-        previewGreg.textContent = '—';
-    }
-
-    if (sy && sm && sd && sy >= 1300 && sy <= 1500 && sm >= 1 && sm <= 12) {
-        previewShamsi.textContent = `${sy}-${pad2(sm)}-${pad2(sd)} (${SHAMSI_MONTHS[sm-1]})`;
-    } else {
-        previewShamsi.textContent = '—';
-    }
-}
-
-function updateShamsiShortPreview() {
-    const input = document.getElementById('paymentDateInput');
-    const preview = document.getElementById('shamsiPreview');
-    if (!input || !preview) return;
-
-    const parsed = parseGregDateSafe(input.value);
-    if (!parsed) {
-        preview.textContent = '—';
-        return;
-    }
-    const s = gregToShamsi(parsed.y, parsed.m, parsed.d);
-    if (!s) {
-        preview.textContent = '—';
-        return;
-    }
-    preview.textContent = `شمسي: ${s.year}/${pad2(s.month)}/${pad2(s.day)} (${SHAMSI_MONTHS[s.month-1]})`;
-}
-
-function applyDate() {
-    const gy = parseInt(document.getElementById('gYear').value, 10);
-    const gm = parseInt(document.getElementById('gMonth').value, 10);
-    const gd = parseInt(document.getElementById('gDay').value, 10);
-
-    if (!gy || !gm || !gd || gy < 1900 || gy > 2200 || gm < 1 || gm > 12 || gd < 1 || gd > 31) {
-        alert('مهرباني وکړئ سمه نېټه ولیکئ');
-        return;
-    }
-
-    const input = document.getElementById('paymentDateInput');
-    input.value = formatGregDate(gy, gm, gd);
-    input.dispatchEvent(new Event('change'));
-    updateShamsiShortPreview();
-    closeDateConverter();
-}
-
-document.getElementById('dateModal')?.addEventListener('click', function(e) {
-    if (e.target === this) closeDateConverter();
-});
 </script>
 
 </body>
