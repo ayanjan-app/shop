@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once 'db.php';
+require_once 'db.php'; // Must define $conn (MySQLi connection)
 
 if(!isset($_SESSION['user_id'])) {
     header("Location: login.php");
@@ -11,7 +11,7 @@ $backupDir = __DIR__ . "/backups/";
 
 // Create backup directory if it doesn't exist
 if (!file_exists($backupDir)) {
-    mkdir($backupDir, 0777, true);
+    mkdir($backupDir, 0755, true);
 }
 
 $success_message = '';
@@ -27,55 +27,143 @@ if (isset($_SESSION['flash_error'])) {
     unset($_SESSION['flash_error']);
 }
 
-// Take backup (POST → redirect to prevent duplicate on refresh)
-if (isset($_POST['backup'])) {
-    $file = $backupDir . "db_backup_" . date("Y-m-d_H-i-s") . ".sql";
-    $mysqldump = "C:\\xampp\\mysql\\bin\\mysqldump.exe";
-
-    $cmd = "\"$mysqldump\" -u root shop > \"$file\" 2>&1";
-    exec($cmd, $output, $return_var);
-    
-    if($return_var === 0) {
-        $_SESSION['flash_success'] = "بیک اپ په بریالیتوب سره جوړ شو: " . basename($file);
-    } else {
-        $_SESSION['flash_error'] = "بیک اپ ناکام شو! تېروتنه: " . implode("\n", $output);
+/* ============================================================
+   PURE PHP BACKUP FUNCTION (Works on cPanel - no exec needed)
+   ============================================================ */
+function backupDatabase($conn, $backupDir) {
+    $tables = [];
+    $result = $conn->query("SHOW TABLES");
+    if (!$result) {
+        return ['success' => false, 'error' => $conn->error];
+    }
+    while ($row = $result->fetch_array()) {
+        $tables[] = $row[0];
     }
 
-    // PRG: redirect to same page to prevent form resubmission on refresh
+    $sql  = "-- Database Backup\n";
+    $sql .= "-- Generated: " . date('Y-m-d H:i:s') . "\n";
+    $sql .= "-- Host: " . $conn->host_info . "\n\n";
+    $sql .= "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";\n";
+    $sql .= "SET time_zone = \"+00:00\";\n";
+    $sql .= "SET FOREIGN_KEY_CHECKS=0;\n\n";
+
+    foreach ($tables as $table) {
+        // Table structure
+        $res = $conn->query("SHOW CREATE TABLE `$table`");
+        if (!$res) continue;
+        $row = $res->fetch_array();
+        $sql .= "\n-- --------------------------------------------------------\n";
+        $sql .= "-- Table structure for `$table`\n";
+        $sql .= "-- --------------------------------------------------------\n\n";
+        $sql .= "DROP TABLE IF EXISTS `$table`;\n";
+        $sql .= $row[1] . ";\n\n";
+
+        // Table data
+        $res = $conn->query("SELECT * FROM `$table`");
+        if (!$res) continue;
+        $numFields = $res->field_count;
+
+        if ($res->num_rows > 0) {
+            $sql .= "--\n-- Dumping data for table `$table`\n--\n\n";
+            while ($row = $res->fetch_row()) {
+                $sql .= "INSERT INTO `$table` VALUES(";
+                for ($j = 0; $j < $numFields; $j++) {
+                    if (is_null($row[$j])) {
+                        $sql .= "NULL";
+                    } else {
+                        $sql .= "'" . $conn->real_escape_string($row[$j]) . "'";
+                    }
+                    if ($j < ($numFields - 1)) $sql .= ",";
+                }
+                $sql .= ");\n";
+            }
+            $sql .= "\n";
+        }
+    }
+
+    $sql .= "SET FOREIGN_KEY_CHECKS=1;\n";
+
+    $filename = "db_backup_" . date("Y-m-d_H-i-s") . ".sql";
+    $filepath = $backupDir . $filename;
+
+    if (file_put_contents($filepath, $sql) !== false) {
+        return ['success' => true, 'file' => $filename];
+    }
+    return ['success' => false, 'error' => 'د فایل د لیکلو اجازه نشته'];
+}
+
+/* ============================================================
+   PURE PHP RESTORE FUNCTION
+   ============================================================ */
+function restoreDatabase($conn, $filepath) {
+    $sql = file_get_contents($filepath);
+    if ($sql === false) return false;
+
+    // Remove comments and split into statements safely
+    if ($conn->multi_query($sql)) {
+        do {
+            if ($result = $conn->store_result()) {
+                $result->free();
+            }
+        } while ($conn->more_results() && $conn->next_result());
+        return true;
+    }
+    return false;
+}
+
+/* ============================================================
+   TAKE BACKUP (POST → redirect to prevent duplicate on refresh)
+   ============================================================ */
+if (isset($_POST['backup'])) {
+    // Increase limits for large DBs
+    @set_time_limit(0);
+    @ini_set('memory_limit', '512M');
+
+    $result = backupDatabase($conn, $backupDir);
+
+    if ($result['success']) {
+        $_SESSION['flash_success'] = "بیک اپ په بریالیتوب سره جوړ شو: " . $result['file'];
+    } else {
+        $_SESSION['flash_error'] = "بیک اپ ناکام شو! تېروتنه: " . $result['error'];
+    }
+
     header("Location: " . strtok($_SERVER["REQUEST_URI"], '?'));
     exit();
 }
 
-// Restore
+/* ============================================================
+   RESTORE
+   ============================================================ */
 if (isset($_GET['restore'])) {
+    @set_time_limit(0);
+    @ini_set('memory_limit', '512M');
+
     $filename = basename($_GET['restore']);
     $file = $backupDir . $filename;
-    
-    if(file_exists($file)) {
-        $mysql = "C:\\xampp\\mysql\\bin\\mysql.exe";
-        $cmd = "\"$mysql\" -u root shop < \"$file\" 2>&1";
-        exec($cmd, $output, $return_var);
-        
-        if($return_var === 0) {
+
+    if (file_exists($file)) {
+        if (restoreDatabase($conn, $file)) {
             $_SESSION['flash_success'] = "ډیټابیس په بریالیتوب سره بحال شو د: " . $filename;
         } else {
-            $_SESSION['flash_error'] = "بحالول ناکام شول! تېروتنه: " . implode("\n", $output);
+            $_SESSION['flash_error'] = "بحالول ناکام شول! تېروتنه: " . $conn->error;
         }
     } else {
         $_SESSION['flash_error'] = "د بیک اپ فایل ونه موندل شو!";
     }
-    
+
     header("Location: " . strtok($_SERVER["REQUEST_URI"], '?'));
     exit();
 }
 
-// Delete
+/* ============================================================
+   DELETE
+   ============================================================ */
 if (isset($_GET['delete'])) {
     $filename = basename($_GET['delete']);
     $file = $backupDir . $filename;
-    
-    if(file_exists($file)) {
-        if(unlink($file)) {
+
+    if (file_exists($file)) {
+        if (unlink($file)) {
             $_SESSION['flash_success'] = "بیک اپ په بریالیتوب سره ړنګ شو: " . $filename;
         } else {
             $_SESSION['flash_error'] = "د بیک اپ فایل ړنګول ناکام شول!";
@@ -83,7 +171,7 @@ if (isset($_GET['delete'])) {
     } else {
         $_SESSION['flash_error'] = "د بیک اپ فایل ونه موندل شو!";
     }
-    
+
     header("Location: " . strtok($_SERVER["REQUEST_URI"], '?'));
     exit();
 }
@@ -153,11 +241,8 @@ function formatFileSize($bytes) {
             min-height: 100vh;
             font-size: 14px;
             line-height: 1.6;
-            margin-top: -50px;
-     
         }
 
-        /* Page Header */
         .page-header {
             display: flex;
             justify-content: space-between;
@@ -191,7 +276,6 @@ function formatFileSize($bytes) {
             font-size: 0.85rem;
         }
 
-        /* Alert Messages */
         .alert {
             padding: 14px 20px;
             border-radius: 12px;
@@ -216,7 +300,6 @@ function formatFileSize($bytes) {
             border-right: 4px solid var(--danger-color);
         }
 
-        /* Stats Cards */
         .stats-cards {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -262,7 +345,6 @@ function formatFileSize($bytes) {
         .stat-card:nth-child(2) { border-top: 4px solid var(--accent-color); }
         .stat-card:nth-child(3) { border-top: 4px solid var(--success-color); }
 
-        /* Table Container */
         .table-container {
             background: var(--card-bg);
             border-radius: var(--border-radius);
@@ -367,7 +449,6 @@ function formatFileSize($bytes) {
             font-size: 0.9rem;
         }
 
-        /* Action Buttons */
         .action-buttons-table {
             display: flex;
             gap: 8px;
@@ -422,7 +503,6 @@ function formatFileSize($bytes) {
             box-shadow: 0 5px 15px rgba(239, 68, 68, 0.3);
         }
 
-        /* Backup Controls Container */
         .backup-controls-container {
             background: var(--card-bg);
             border-radius: var(--border-radius);
@@ -464,7 +544,6 @@ function formatFileSize($bytes) {
             font-size: 1.3rem;
         }
 
-        /* Buttons */
         .btn {
             padding: 12px 24px;
             border: none;
@@ -504,7 +583,6 @@ function formatFileSize($bytes) {
             transform: translateY(-3px);
         }
 
-        /* Action Buttons */
         .action-buttons {
             display: flex;
             gap: 15px;
@@ -512,7 +590,6 @@ function formatFileSize($bytes) {
             flex-wrap: wrap;
         }
 
-        /* Backup Info Section */
         .backup-info {
             background: #f8fafc;
             padding: 20px;
@@ -559,7 +636,6 @@ function formatFileSize($bytes) {
             display: inline-block;
         }
 
-        /* Empty State */
         .empty-state {
             text-align: center;
             padding: 40px 20px;
@@ -577,7 +653,6 @@ function formatFileSize($bytes) {
             margin-bottom: 10px;
         }
 
-        /* Confirmation Modal */
         .modal {
             display: none;
             position: fixed;
@@ -639,7 +714,6 @@ function formatFileSize($bytes) {
             min-width: 120px;
         }
 
-        /* Search and Filter */
         .table-controls {
             display: flex;
             gap: 15px;
@@ -697,13 +771,11 @@ function formatFileSize($bytes) {
             box-shadow: 0 0 0 4px rgba(30, 60, 114, 0.1);
         }
 
-        /* Animation */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(15px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Responsive Design */
         @media (max-width: 768px) {
             .stats-cards {
                 grid-template-columns: 1fr;
@@ -787,7 +859,6 @@ function formatFileSize($bytes) {
             }
         }
 
-        /* Backup Status Indicators */
         .backup-status {
             display: inline-flex;
             align-items: center;
@@ -808,15 +879,8 @@ function formatFileSize($bytes) {
             font-weight: 600;
         }
 
-        /* Main Content spacing for sidebar */
         .main-content {
             padding: 20px;
-        }
-
-        @media (max-width: 768px) {
-            .main-content {
-  
-            }
         }
     </style>
 </head>
@@ -1070,7 +1134,6 @@ function formatFileSize($bytes) {
     </div>
 
     <script>
-        // Helper function to format file size
         function formatFileSize(bytes) {
             if (bytes === 0) return '0 Bytes';
             const k = 1024;
@@ -1079,14 +1142,12 @@ function formatFileSize($bytes) {
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
 
-        // DOM Elements
         const searchInput = document.getElementById('searchInput');
         const filterSelect = document.getElementById('filterSelect');
         let allBackups = [];
         let backupToRestore = null;
         let backupToDelete = null;
 
-        // Initialize all backups data
         document.addEventListener('DOMContentLoaded', function() {
             const rows = document.querySelectorAll('#backupTableBody tr');
             allBackups = Array.from(rows).map(row => ({
@@ -1099,7 +1160,6 @@ function formatFileSize($bytes) {
             }));
         });
 
-        // Search functionality
         function searchBackups() {
             const searchTerm = searchInput.value.toLowerCase();
             const rows = document.querySelectorAll('#backupTableBody tr');
@@ -1111,7 +1171,6 @@ function formatFileSize($bytes) {
             });
         }
 
-        // Filter functionality
         function filterBackups() {
             const filter = filterSelect.value;
             const rows = document.querySelectorAll('#backupTableBody tr');
@@ -1135,17 +1194,14 @@ function formatFileSize($bytes) {
             });
         }
 
-        // Refresh page
         function refreshPage() {
             window.location.href = window.location.pathname;
         }
 
-        // Confirm backup creation
         function confirmBackup() {
             return confirm('ایا تاسو ډاډه یاست چې غواړئ نوی بیک اپ جوړ کړئ؟ دا ممکن څو شېبې وخت ونیسي.');
         }
 
-        // Restore functionality
         function confirmRestore(filename) {
             backupToRestore = filename;
             document.getElementById('restoreFilename').textContent = filename;
@@ -1158,7 +1214,6 @@ function formatFileSize($bytes) {
             }
         }
 
-        // Delete functionality
         function confirmDelete(filename) {
             backupToDelete = filename;
             document.getElementById('deleteFilename').textContent = filename;
@@ -1171,14 +1226,12 @@ function formatFileSize($bytes) {
             }
         }
 
-        // Close modal
         function closeModal(modalId) {
             document.getElementById(modalId).style.display = 'none';
             if(modalId === 'restoreModal') backupToRestore = null;
             if(modalId === 'deleteModal') backupToDelete = null;
         }
 
-        // Modal close handlers
         window.onclick = function(event) {
             const restoreModal = document.getElementById('restoreModal');
             const deleteModal = document.getElementById('deleteModal');
@@ -1187,11 +1240,9 @@ function formatFileSize($bytes) {
             if(event.target == deleteModal) closeModal('deleteModal');
         }
 
-        // Initialize buttons
         document.getElementById('confirmRestoreBtn').addEventListener('click', restoreBackup);
         document.getElementById('confirmDeleteBtn').addEventListener('click', deleteBackup);
 
-        // Keyboard shortcuts
         document.addEventListener('keydown', function(e) {
             if(e.key === 'Escape') {
                 closeModal('restoreModal');
@@ -1199,10 +1250,8 @@ function formatFileSize($bytes) {
             }
         });
 
-        // Mobile touch handling
         document.addEventListener('touchstart', function() {}, {passive: true});
 
-        // Auto-hide success message after 5 seconds
         <?php if($success_message): ?>
             setTimeout(function() {
                 const alerts = document.querySelectorAll('.alert');
