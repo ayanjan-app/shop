@@ -307,6 +307,9 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
             font-size: 0.85rem;
             margin-top: 5px;
         }
+          #gregorianDateInput{
+            margin-left: -30px;
+        }
 
         /* ===== Stats Cards ===== */
         .stats-grid {

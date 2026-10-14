@@ -482,6 +482,10 @@ $money_types_list = ['چیني', 'افغاني', 'ډالر'];
             margin-right: 6px;
         }
 
+        #gregorianDateInput{
+            margin-left: -30px;
+        }
+
         /* ===== DUAL DATE CELLS IN TABLE ===== */
         .date-us-cell {
             display: inline-flex;
@@ -687,7 +691,7 @@ $money_types_list = ['چیني', 'افغاني', 'ډالر'];
                             <label><i class="fas fa-globe"></i> میادي (US)</label>
                             <input type="date" 
                                    id="gregorianDateInput" 
-                                   value="<?php echo $today_date; ?>">
+                                   value="<?php echo $today_date; ?>"  >
                         </div>
                         <div class="date-field">
                             <label><i class="fas fa-moon"></i> هجري شمسي (افغاني)</label>
