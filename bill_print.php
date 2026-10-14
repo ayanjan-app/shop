@@ -483,7 +483,7 @@ $today_afghan = formatAfghanDateFromGregorian(date('Y-m-d'));
         <i class="fas fa-receipt"></i> د بیل مخکتنه — <?php echo htmlspecialchars($client['full_name']); ?>
     </div>
     <div class="actions">
-        <a href="client_payments.php" class="btn-back">
+        <a href="pay.php" class="btn-back">
             <i class="fas fa-arrow-right"></i> بیرته
         </a>
         <button onclick="window.print()" class="btn-print">

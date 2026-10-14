@@ -3,6 +3,118 @@
 include "db.php";
 
 // =========================
+// AFGHAN (SOLAR HIJRI) DATE CONVERTER
+// =========================
+function gregorianToAfghan($gy, $gm, $gd) {
+    $g_d_m = [0,31,59,90,120,151,181,212,243,273,304,334];
+    $gy2 = ($gm > 2) ? ($gy + 1) : $gy;
+    $days = 355666 + (365 * $gy) + ((int)(($gy2 + 3) / 4)) - ((int)(($gy2 + 99) / 100)) + ((int)(($gy2 + 399) / 400)) + $gd + $g_d_m[$gm - 1];
+    $jy = -1595 + (33 * ((int)($days / 12053)));
+    $days %= 12053;
+    $jy += 4 * ((int)($days / 1461));
+    $days %= 1461;
+    if ($days > 365) {
+        $jy += (int)(($days - 1) / 365);
+        $days = ($days - 1) % 365;
+    }
+    if ($days < 186) {
+        $jm = 1 + (int)($days / 31);
+        $jd = 1 + ($days % 31);
+    } else {
+        $jm = 7 + (int)(($days - 186) / 30);
+        $jd = 1 + (($days - 186) % 30);
+    }
+    return [$jy, $jm, $jd];
+}
+
+function afghanToGregorian($jy, $jm, $jd) {
+    $jy += 1595;
+    $days = -355668 + (365 * $jy) + (((int)($jy / 33)) * 8) + ((int)((($jy % 33) + 3) / 4)) + $jd + (($jm < 7) ? ($jm - 1) * 31 : (($jm - 7) * 30) + 186);
+    $gy = 400 * ((int)($days / 146097));
+    $days %= 146097;
+    if ($days > 36524) {
+        $gy += 100 * ((int)(--$days / 36524));
+        $days %= 36524;
+        if ($days >= 365) $days++;
+    }
+    $gy += 4 * ((int)($days / 1461));
+    $days %= 1461;
+    if ($days > 365) {
+        $gy += (int)(($days - 1) / 365);
+        $days = ($days - 1) % 365;
+    }
+    $gd = $days + 1;
+    $sal_a = [0,31,($gy % 4 == 0 && $gy % 100 != 0) || ($gy % 400 == 0) ? 29 : 28,31,30,31,30,31,31,30,31,30,31];
+    for ($gm = 0; $gm < 13 && $gd > $sal_a[$gm]; $gm++) {
+        $gd -= $sal_a[$gm];
+    }
+    return [$gy, $gm, $gd];
+}
+
+function formatAfghanDate($gy, $gm, $gd) {
+    return sprintf('%04d/%02d/%02d', $gy, $gm, $gd);
+}
+
+function formatAfghanDateFromGregorian($gregorianDate) {
+    if (empty($gregorianDate) || $gregorianDate === '0000-00-00') return '—';
+    $parts = explode('-', $gregorianDate);
+    if (count($parts) < 3) return $gregorianDate;
+    [$gy, $gm, $gd] = [(int)$parts[0], (int)$parts[1], (int)$parts[2]];
+    [$jy, $jm, $jd] = gregorianToAfghan($gy, $gm, $gd);
+    return sprintf('%04d/%02d/%02d', $jy, $jm, $jd);
+}
+
+// =========================
+// AJAX: DATE CONVERTER
+// =========================
+if (isset($_GET['ajax_date_convert'])) {
+    header('Content-Type: application/json');
+    
+    $type = $_GET['type'] ?? '';
+    
+    if ($type === 'to_afghan') {
+        $gy = intval($_GET['gy'] ?? 0);
+        $gm = intval($_GET['gm'] ?? 0);
+        $gd = intval($_GET['gd'] ?? 0);
+        
+        if ($gy <= 0 || $gm <= 0 || $gm > 12 || $gd <= 0 || $gd > 31) {
+            echo json_encode(['success' => false, 'message' => 'Invalid Gregorian date']);
+            exit();
+        }
+        
+        [$jy, $jm, $jd] = gregorianToAfghan($gy, $gm, $gd);
+        echo json_encode([
+            'success' => true,
+            'afghan' => formatAfghanDate($jy, $jm, $jd),
+            'jy' => $jy, 'jm' => $jm, 'jd' => $jd
+        ]);
+        exit();
+    }
+    
+    if ($type === 'to_gregorian') {
+        $jy = intval($_GET['jy'] ?? 0);
+        $jm = intval($_GET['jm'] ?? 0);
+        $jd = intval($_GET['jd'] ?? 0);
+        
+        if ($jy <= 0 || $jm <= 0 || $jm > 12 || $jd <= 0 || $jd > 31) {
+            echo json_encode(['success' => false, 'message' => 'Invalid Afghan date']);
+            exit();
+        }
+        
+        [$gy, $gm, $gd] = afghanToGregorian($jy, $jm, $jd);
+        echo json_encode([
+            'success' => true,
+            'gregorian' => sprintf('%04d-%02d-%02d', $gy, $gm, $gd),
+            'gy' => $gy, 'gm' => $gm, 'gd' => $gd
+        ]);
+        exit();
+    }
+    
+    echo json_encode(['success' => false, 'message' => 'Invalid type']);
+    exit();
+}
+
+// =========================
 // DELETE EXPENSE
 // =========================
 
@@ -100,6 +212,8 @@ $today_total = $today_data['today_total'] ?? 0;
 
 // Today's date in Y-m-d format for the date input default value
 $today_date = date('Y-m-d');
+list($today_jy, $today_jm, $today_jd) = gregorianToAfghan((int)date('Y'), (int)date('n'), (int)date('j'));
+$today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
 
 ?>
 
@@ -361,6 +475,136 @@ $today_date = date('Y-m-d');
             text-align: right;
         }
 
+        /* ===== DATE CONVERTER ===== */
+        .date-converter {
+            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+            border: 2px solid #7dd3fc;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .date-converter .converter-title {
+            font-weight: 700;
+            color: #0369a1;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .date-converter .converter-title i { color: #0ea5e9; }
+        .date-converter-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            align-items: end;
+        }
+        @media (max-width: 480px) {
+            .date-converter-row { grid-template-columns: 1fr; }
+        }
+        .date-field label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #0369a1;
+        }
+        .date-field label i { color: #0ea5e9; margin-left: 4px; }
+        .date-field input[type="date"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #bae6fd;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            background: #ffffff;
+            color: #0c4a6e;
+            transition: var(--transition);
+            direction: ltr;
+            text-align: left;
+            min-height: 44px;
+        }
+        .date-field input[type="date"]:focus {
+            outline: none;
+            border-color: #0ea5e9;
+            box-shadow: 0 0 0 4px rgba(14,165,233,0.15);
+        }
+        .date-field .afghan-date-input {
+            display: flex;
+            gap: 4px;
+        }
+        .date-field .afghan-date-input select {
+            flex: 1;
+            padding: 10px 6px;
+            border: 2px solid #bae6fd;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-family: inherit;
+            background: #ffffff;
+            color: #0c4a6e;
+            transition: var(--transition);
+            text-align: center;
+            min-height: 44px;
+            -webkit-appearance: auto !important;
+            appearance: auto !important;
+            background-image: none !important;
+            padding-right: 6px !important;
+            cursor: pointer;
+        }
+        .date-field .afghan-date-input select:focus {
+            outline: none;
+            border-color: #0ea5e9;
+            box-shadow: 0 0 0 4px rgba(14,165,233,0.15);
+        }
+        .date-sync-hint {
+            font-size: 0.7rem;
+            color: #0369a1;
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 600;
+        }
+        .date-sync-hint i { color: #0ea5e9; font-size: 0.75rem; }
+        .date-converter .converter-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: #0ea5e9;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            margin-right: 6px;
+        }
+
+        /* ===== DUAL DATE CELLS IN TABLE ===== */
+        .date-us-cell {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: 700;
+            color: #1e3c72;
+            font-size: 0.85rem;
+        }
+        .date-us-cell i {
+            color: #16a34a;
+            font-size: 0.72rem;
+        }
+        .date-af-cell {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: 700;
+            color: #991b1b;
+            font-size: 0.85rem;
+        }
+        .date-af-cell i {
+            color: #e6b12e;
+            font-size: 0.72rem;
+        }
+
         .btn {
             display: inline-flex;
             align-items: center;
@@ -497,6 +741,7 @@ $today_date = date('Y-m-d');
             width: 100%;
             border-collapse: collapse;
             font-size: 0.92rem;
+            min-width: 900px;
         }
 
         thead {
@@ -509,6 +754,12 @@ $today_date = date('Y-m-d');
             color: white;
             font-weight: 600;
             font-size: 0.85rem;
+            white-space: nowrap;
+        }
+        th small {
+            font-weight: 400;
+            opacity: 0.85;
+            font-size: 0.7rem;
         }
 
         td {
@@ -742,11 +993,37 @@ $today_date = date('Y-m-d');
                     <input type="text" name="person" placeholder="مثال: احمد" required>
                 </div>
 
-                <div class="form-group">
-                    <label><i class="fas fa-calendar"></i> نېټه</label>
-                    <!-- ✅ Default value set to today's date -->
-                    <input type="date" name="expense_date" value="<?php echo $today_date; ?>" required>
+                <!-- ===== DATE CONVERTER ===== -->
+                <div class="date-converter">
+                    <div class="converter-title">
+                        <i class="fas fa-calendar-alt"></i>
+                        نیټه (دواړه تقویمونه)
+                        <span class="converter-badge"><i class="fas fa-sync-alt"></i> اتومات تړاو</span>
+                    </div>
+                    <div class="date-converter-row">
+                        <div class="date-field">
+                            <label><i class="fas fa-globe"></i> میادي (US)</label>
+                            <input type="date" 
+                                   id="gregorianDateInput" 
+                                   value="<?php echo $today_date; ?>">
+                        </div>
+                        <div class="date-field">
+                            <label><i class="fas fa-moon"></i> هجري شمسي (افغاني)</label>
+                            <div class="afghan-date-input">
+                                <select id="afghanYearSelect"></select>
+                                <select id="afghanMonthSelect"></select>
+                                <select id="afghanDaySelect"></select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="date-sync-hint">
+                        <i class="fas fa-info-circle"></i>
+                        یو تقویم بدل کړئ، بل به اتومات ډک شي
+                    </div>
                 </div>
+
+                <!-- Hidden input for the actual expense_date sent to server -->
+                <input type="hidden" name="expense_date" id="expenseDateHidden" value="<?php echo $today_date; ?>">
 
                 <button type="submit" name="add_expense" class="btn btn-primary">
                     <i class="fas fa-save"></i> لګښت اضافه کړئ
@@ -809,7 +1086,8 @@ $today_date = date('Y-m-d');
                             <th>اندازه</th>
                             <th>د څه لپاره</th>
                             <th>کس</th>
-                            <th>نېټه</th>
+                            <th>میادي نېټه<br><small>(US)</small></th>
+                            <th>افغاني نېټه<br><small>(هجري شمسي)</small></th>
                             <th>کړنې</th>
                         </tr>
                     </thead>
@@ -821,7 +1099,18 @@ $today_date = date('Y-m-d');
                                     <td class="amount-cell"><?php echo number_format($row['amount'], 2); ?></td>
                                     <td><?php echo htmlspecialchars($row['used_for']); ?></td>
                                     <td><?php echo htmlspecialchars($row['person']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['expense_date']); ?></td>
+                                    <td>
+                                        <span class="date-us-cell">
+                                            <i class="fas fa-globe"></i>
+                                            <?php echo htmlspecialchars($row['expense_date']); ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="date-af-cell">
+                                            <i class="fas fa-moon"></i>
+                                            <?php echo formatAfghanDateFromGregorian($row['expense_date']); ?>
+                                        </span>
+                                    </td>
                                     <td>
                                         <!-- ✅ Delete button -->
                                         <a href="?delete_id=<?php echo $row['id']; ?>" 
@@ -835,7 +1124,7 @@ $today_date = date('Y-m-d');
                             <?php endwhile; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="6">
+                                <td colspan="7">
                                     <div class="empty-state">
                                         <i class="fas fa-inbox"></i>
                                         د دې فلټر لپاره هیڅ لګښت ونه موندل شو.
@@ -862,6 +1151,134 @@ $today_date = date('Y-m-d');
     </div>
 
 </div>
+
+<script>
+    // ============================================
+    // AFGHAN DATE CONVERTER
+    // ============================================
+    const AFGHAN_MONTHS = [
+        'حمل', 'ثور', 'جوزا', 'سرطان', 'اسد', 'سنبله',
+        'میزان', 'عقرب', 'قوس', 'جدی', 'دلو', 'حوت'
+    ];
+
+    const gregorianDateInput = document.getElementById('gregorianDateInput');
+    const afghanYearSelect = document.getElementById('afghanYearSelect');
+    const afghanMonthSelect = document.getElementById('afghanMonthSelect');
+    const afghanDaySelect = document.getElementById('afghanDaySelect');
+    const expenseDateHidden = document.getElementById('expenseDateHidden');
+
+    function populateAfghanYears() {
+        const currentYear = parseInt('<?php echo $today_jy; ?>');
+        afghanYearSelect.innerHTML = '';
+        for (let y = currentYear - 30; y <= currentYear + 30; y++) {
+            const opt = document.createElement('option');
+            opt.value = y;
+            opt.textContent = y;
+            afghanYearSelect.appendChild(opt);
+        }
+    }
+
+    function populateAfghanMonths() {
+        afghanMonthSelect.innerHTML = '';
+        AFGHAN_MONTHS.forEach((name, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx + 1;
+            opt.textContent = (idx + 1) + ' - ' + name;
+            afghanMonthSelect.appendChild(opt);
+        });
+    }
+
+    function populateAfghanDays(jy, jm, selectedDay) {
+        afghanDaySelect.innerHTML = '';
+        let maxDays;
+        if (jm <= 6) maxDays = 31;
+        else if (jm <= 11) maxDays = 30;
+        else {
+            const isLeap = ((jy % 33) % 4 === 1);
+            maxDays = isLeap ? 30 : 29;
+        }
+        for (let d = 1; d <= maxDays; d++) {
+            const opt = document.createElement('option');
+            opt.value = d;
+            opt.textContent = d;
+            afghanDaySelect.appendChild(opt);
+        }
+        if (selectedDay && selectedDay <= maxDays) {
+            afghanDaySelect.value = selectedDay;
+        }
+    }
+
+    function syncToAfghan() {
+        const val = gregorianDateInput.value;
+        if (!val) return;
+        const [gy, gm, gd] = val.split('-').map(Number);
+
+        fetch('?ajax_date_convert=1&type=to_afghan&gy=' + gy + '&gm=' + gm + '&gd=' + gd)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) return;
+                afghanYearSelect.value = data.jy;
+                afghanMonthSelect.value = data.jm;
+                populateAfghanDays(data.jy, data.jm, data.jd);
+                afghanDaySelect.value = data.jd;
+                expenseDateHidden.value = val;
+            })
+            .catch(err => console.error('Date convert error:', err));
+    }
+
+    function syncToGregorian() {
+        const jy = parseInt(afghanYearSelect.value);
+        const jm = parseInt(afghanMonthSelect.value);
+        const jd = parseInt(afghanDaySelect.value);
+
+        if (!jy || !jm || !jd) return;
+
+        fetch('?ajax_date_convert=1&type=to_gregorian&jy=' + jy + '&jm=' + jm + '&jd=' + jd)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) return;
+                gregorianDateInput.value = data.gregorian;
+                expenseDateHidden.value = data.gregorian;
+            })
+            .catch(err => console.error('Date convert error:', err));
+    }
+
+    gregorianDateInput.addEventListener('change', syncToAfghan);
+
+    afghanYearSelect.addEventListener('change', function() {
+        populateAfghanDays(
+            parseInt(afghanYearSelect.value),
+            parseInt(afghanMonthSelect.value),
+            parseInt(afghanDaySelect.value)
+        );
+        syncToGregorian();
+    });
+    afghanMonthSelect.addEventListener('change', function() {
+        populateAfghanDays(
+            parseInt(afghanYearSelect.value),
+            parseInt(afghanMonthSelect.value),
+            parseInt(afghanDaySelect.value)
+        );
+        syncToGregorian();
+    });
+    afghanDaySelect.addEventListener('change', syncToGregorian);
+
+    (function initDateConverter() {
+        populateAfghanYears();
+        populateAfghanMonths();
+
+        const initJy = parseInt('<?php echo $today_jy; ?>');
+        const initJm = parseInt('<?php echo $today_jm; ?>');
+        const initJd = parseInt('<?php echo $today_jd; ?>');
+
+        afghanYearSelect.value = initJy;
+        afghanMonthSelect.value = initJm;
+        populateAfghanDays(initJy, initJm, initJd);
+        afghanDaySelect.value = initJd;
+
+        expenseDateHidden.value = gregorianDateInput.value;
+    })();
+</script>
 
 </body>
 </html>
