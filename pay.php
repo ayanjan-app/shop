@@ -1797,64 +1797,81 @@ $today_date = date('Y-m-d');
     }
 
     /* ============================================================
-       SHAMSI ⇄ GREGORIAN DATE CONVERTER
+       Accurate Shamsi (Afghan/Persian) ⇄ Gregorian Converter
+       Based on the well-known Kuwaiti algorithm (jalali.js)
        ============================================================ */
     const SHAMSI_MONTHS = ['حمل','ثور','جوزا','سرطان','اسد','سنبله','میزان','عقرب','قوس','جدي','دلو','حوت'];
     const GREG_MONTHS   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
     let currentCalendar = 'greg';
 
-    function gregorianToJDN(gy, gm, gd) {
-        const a = Math.floor((14 - gm) / 12);
-        const y = gy + 4800 - a;
-        const m = gm + 12 * a - 3;
-        return gd + Math.floor((153 * m + 2) / 5) + 365 * y +
-               Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) - 32045;
-    }
-    function jdnToGregorian(jdn) {
-        let a = jdn + 32044;
-        let b = Math.floor((4 * a + 3) / 146097);
-        let c = a - Math.floor((146097 * b) / 4);
-        let d = Math.floor((4 * c + 3) / 1461);
-        let e = c - Math.floor((1461 * d) / 4);
-        let m = Math.floor((5 * e + 2) / 153);
-        return {
-            day:   e - Math.floor((153 * m + 2) / 5) + 1,
-            month: m + 3 - 12 * Math.floor(m / 10),
-            year:  (100 * b + d - 4800 + Math.floor(m / 10)) | 0
-        };
-    }
-    function jdnToShamsi(jdn) {
-        const g = jdnToGregorian(jdn);
-        let gy = g.year, gm = g.month, gd = g.day;
-        let jy = gy - 621;
-        const gDayNo = gregorianToJDN(gy, gm, gd);
-        const jDayNo = gregorianToJDN(jy, 3, 21);
-        let days = gDayNo - jDayNo;
-        if (days < 0) {
-            jy--;
-            days = gDayNo - gregorianToJDN(jy, 3, 21);
-        }
-        let jm, jd;
-        if (days < 186) {
-            jm = Math.floor(days / 31) + 1;
-            jd = (days % 31) + 1;
-        } else {
-            jm = Math.floor((days - 186) / 30) + 7;
-            jd = ((days - 186) % 30) + 1;
-        }
-        return { day: jd, month: jm, year: jy };
-    }
-    function shamsiToGregorian(jy, jm, jd) {
-        let gy = jy + 621;
-        const jDayNo = (jm <= 7) ? (jm - 1) * 31 + jd
-                                 : 186 + (jm - 7) * 30 + jd;
-        const gDayNo = gregorianToJDN(gy, 3, 21) + (jDayNo - 1);
-        return jdnToGregorian(gDayNo);
-    }
+    function div(a, b) { return ~~(a / b); }
+    function mod(a, b) { return a - ~~(a / b) * b; }
+
+    // Gregorian → Shamsi (Jalali)
     function gregToShamsi(gy, gm, gd) {
-        const jdn = gregorianToJDN(gy, gm, gd);
-        return jdnToShamsi(jdn);
+        let jy = (gy <= 1600) ? 0 : 979;
+        gy -= (gy <= 1600) ? 621 : 1600;
+        const gy2 = (gm > 2) ? (gy + 1) : gy;
+        let days = (365 * gy) +
+                   div((gy2 + 3), 4) -
+                   div((gy2 + 99), 100) +
+                   div((gy2 + 399), 400) -
+                   80 + gd + [0,31,59,90,120,151,181,212,243,273,304,334][gm - 1];
+        jy += 1595;
+        let j_days = -1 * (jy * 365) +
+                     div(jy, 33) * 8 +
+                     div(mod(jy, 33) + 3, 4) +
+                     78 + days;
+        let jm, jd;
+        let j_np = div(j_days, 12053);
+        j_days %= 12053;
+        jy += 33 * j_np;
+        jy += 4 * div(j_days, 1461);
+        j_days %= 1461;
+        if (j_days > 365) {
+            jy += div(j_days - 1, 365);
+            j_days = (j_days - 1) % 365;
+        }
+        if (j_days < 186) {
+            jm = 1 + div(j_days, 31);
+            jd = 1 + mod(j_days, 31);
+        } else {
+            jm = 7 + div(j_days - 186, 30);
+            jd = 1 + mod(j_days - 186, 30);
+        }
+        return { year: jy, month: jm, day: jd };
+    }
+
+    // Shamsi (Jalali) → Gregorian
+    function shamsiToGregorian(jy, jm, jd) {
+        let gy = (jy <= 979) ? 621 : 1600;
+        jy -= (jy <= 979) ? 0 : 979;
+        let days = (365 * jy) +
+                   (div(jy, 33) * 8) +
+                   div(mod(jy, 33) + 3, 4) +
+                   78 + jd +
+                   ((jm < 7) ? (jm - 1) * 31 : ((jm - 7) * 30) + 186);
+        let gy2 = (days > 79) ? gy + 1 : gy;
+        days -= (days > 79) ? 79 : -1 * (gy2 - gy) * 365;
+
+        while (true) {
+            const leap = (gy2 % 4 === 0 && (gy2 % 100 !== 0 || gy2 % 400 === 0)) ? 366 : 365;
+            if (days < leap) break;
+            days -= leap;
+            gy2++;
+        }
+        const g_d_m = [0,31,28,31,30,31,30,31,31,30,31,30,31];
+        const isLeap = (gy2 % 4 === 0 && (gy2 % 100 !== 0 || gy2 % 400 === 0));
+        let gm = 1;
+        while (gm <= 12) {
+            let dim = g_d_m[gm];
+            if (gm === 2 && isLeap) dim = 29;
+            if (days < dim) break;
+            days -= dim;
+            gm++;
+        }
+        return { year: gy2, month: gm, day: days + 1 };
     }
 
     function pad2(n) { return String(n).padStart(2, '0'); }
