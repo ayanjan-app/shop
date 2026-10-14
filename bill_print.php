@@ -23,6 +23,40 @@ if (!$client) {
     die("Client not found.");
 }
 
+// =========================
+// AFGHAN (SOLAR HIJRI) DATE CONVERTER
+// =========================
+function gregorianToAfghan($gy, $gm, $gd) {
+    $g_d_m = [0,31,59,90,120,151,181,212,243,273,304,334];
+    $gy2 = ($gm > 2) ? ($gy + 1) : $gy;
+    $days = 355666 + (365 * $gy) + ((int)(($gy2 + 3) / 4)) - ((int)(($gy2 + 99) / 100)) + ((int)(($gy2 + 399) / 400)) + $gd + $g_d_m[$gm - 1];
+    $jy = -1595 + (33 * ((int)($days / 12053)));
+    $days %= 12053;
+    $jy += 4 * ((int)($days / 1461));
+    $days %= 1461;
+    if ($days > 365) {
+        $jy += (int)(($days - 1) / 365);
+        $days = ($days - 1) % 365;
+    }
+    if ($days < 186) {
+        $jm = 1 + (int)($days / 31);
+        $jd = 1 + ($days % 31);
+    } else {
+        $jm = 7 + (int)(($days - 186) / 30);
+        $jd = 1 + (($days - 186) % 30);
+    }
+    return [$jy, $jm, $jd];
+}
+
+function formatAfghanDateFromGregorian($gregorianDate) {
+    if (empty($gregorianDate) || $gregorianDate === '0000-00-00') return '—';
+    $parts = explode('-', $gregorianDate);
+    if (count($parts) < 3) return $gregorianDate;
+    [$gy, $gm, $gd] = [(int)$parts[0], (int)$parts[1], (int)$parts[2]];
+    [$jy, $jm, $jd] = gregorianToAfghan($gy, $gm, $gd);
+    return sprintf('%04d/%02d/%02d', $jy, $jm, $jd);
+}
+
 // ==== Totals per currency ====
 function getTotals($conn, $client_id, $currency) {
     $invStmt = $conn->prepare("SELECT COALESCE(SUM(total_amount), 0) AS total FROM sales WHERE client_id = ? AND currency = ?");
@@ -70,6 +104,7 @@ while ($r = $res->fetch_assoc()) $payList[] = $r;
 $payQ->close();
 
 $today = date('Y-m-d H:i');
+$today_afghan = formatAfghanDateFromGregorian(date('Y-m-d'));
 ?>
 <!DOCTYPE html>
 <html lang="ps" dir="rtl">
@@ -199,6 +234,16 @@ $today = date('Y-m-d H:i');
         color: #94a3b8;
         font-weight: 500;
     }
+    .bill-header .bill-meta .dual-date {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .bill-header .bill-meta .dual-date i {
+        font-size: 0.7rem;
+    }
+    .bill-header .bill-meta .dual-date .us-i { color: #16a34a; }
+    .bill-header .bill-meta .dual-date .af-i { color: #e6b12e; }
 
     .client-info {
         background: #f8fafc;
@@ -318,6 +363,11 @@ $today = date('Y-m-d H:i');
         font-size: 0.78rem;
         white-space: nowrap;
     }
+    .bill-table th small {
+        font-weight: 400;
+        opacity: 0.85;
+        font-size: 0.7rem;
+    }
     .bill-table td {
         padding: 10px;
         text-align: right;
@@ -340,6 +390,39 @@ $today = date('Y-m-d H:i');
         padding: 20px;
         color: #94a3b8;
         font-weight: 600;
+    }
+
+    /* ===== DUAL DATE CELLS ===== */
+    .dual-date-cell {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.82rem;
+        font-weight: 700;
+    }
+    .dual-date-cell .us-date {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        color: #1e3c72;
+    }
+    .dual-date-cell .us-date i {
+        color: #16a34a;
+        font-size: 0.68rem;
+    }
+    .dual-date-cell .af-date {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        color: #991b1b;
+    }
+    .dual-date-cell .af-date i {
+        color: #e6b12e;
+        font-size: 0.68rem;
+    }
+    .dual-date-cell .sep {
+        color: #cbd5e1;
+        font-weight: 400;
     }
 
     /* ===== FOOTER ===== */
@@ -424,7 +507,14 @@ $today = date('Y-m-d H:i');
             </div>
         </div>
         <div class="bill-meta">
-            <div><span class="label">د بیل نېټه:</span> <?php echo $today; ?></div>
+            <div>
+                <span class="label">د بیل نېټه:</span>
+                <span class="dual-date">
+                    <i class="fas fa-globe us-i"></i> <?php echo $today; ?>
+                    &nbsp;|&nbsp;
+                    <i class="fas fa-moon af-i"></i> <?php echo $today_afghan; ?>
+                </span>
+            </div>
             <div><span class="label">د بیل شمېره:</span> BILL-<?php echo str_pad($client['id'], 5, '0', STR_PAD_LEFT); ?></div>
         </div>
     </div>
@@ -487,7 +577,8 @@ $today = date('Y-m-d H:i');
             <tr>
                 <th>#</th>
                 <th>فاکتور شمېره</th>
-                <th>نېټه</th>
+                <th>میادي نېټه<br><small>(US)</small></th>
+                <th>افغاني نېټه<br><small>(هجري شمسي)</small></th>
                 <th>ډول</th>
                 <th>اندازه</th>
             </tr>
@@ -498,7 +589,22 @@ $today = date('Y-m-d H:i');
                     <tr>
                         <td><?php echo $i + 1; ?></td>
                         <td><?php echo htmlspecialchars($inv['invoice_number']); ?></td>
-                        <td><?php echo htmlspecialchars($inv['invoice_date']); ?></td>
+                        <td>
+                            <span class="dual-date-cell">
+                                <span class="us-date">
+                                    <i class="fas fa-globe"></i>
+                                    <?php echo htmlspecialchars($inv['invoice_date']); ?>
+                                </span>
+                            </span>
+                        </td>
+                        <td>
+                            <span class="dual-date-cell">
+                                <span class="af-date">
+                                    <i class="fas fa-moon"></i>
+                                    <?php echo formatAfghanDateFromGregorian($inv['invoice_date']); ?>
+                                </span>
+                            </span>
+                        </td>
                         <td>
                             <span class="badge-<?php echo $inv['currency']; ?>">
                                 <?php echo $inv['currency'] === 'USD' ? 'ډالر' : 'افغاني'; ?>
@@ -511,7 +617,7 @@ $today = date('Y-m-d H:i');
                     </tr>
                 <?php endforeach; ?>
             <?php else: ?>
-                <tr class="empty-row"><td colspan="5">هیڅ فاکتور نشته</td></tr>
+                <tr class="empty-row"><td colspan="6">هیڅ فاکتور نشته</td></tr>
             <?php endif; ?>
         </tbody>
     </table>
@@ -524,7 +630,8 @@ $today = date('Y-m-d H:i');
         <thead>
             <tr>
                 <th>#</th>
-                <th>نېټه</th>
+                <th>میادي نېټه<br><small>(US)</small></th>
+                <th>افغاني نېټه<br><small>(هجري شمسي)</small></th>
                 <th>حواله</th>
                 <th>فاکتور</th>
                 <th>ډول</th>
@@ -536,7 +643,22 @@ $today = date('Y-m-d H:i');
                 <?php foreach ($payList as $i => $p): ?>
                     <tr>
                         <td><?php echo $i + 1; ?></td>
-                        <td><?php echo htmlspecialchars($p['payment_date']); ?></td>
+                        <td>
+                            <span class="dual-date-cell">
+                                <span class="us-date">
+                                    <i class="fas fa-globe"></i>
+                                    <?php echo htmlspecialchars($p['payment_date']); ?>
+                                </span>
+                            </span>
+                        </td>
+                        <td>
+                            <span class="dual-date-cell">
+                                <span class="af-date">
+                                    <i class="fas fa-moon"></i>
+                                    <?php echo formatAfghanDateFromGregorian($p['payment_date']); ?>
+                                </span>
+                            </span>
+                        </td>
                         <td><?php echo !empty($p['hawala_number']) ? htmlspecialchars($p['hawala_number']) : '—'; ?></td>
                         <td><?php echo htmlspecialchars($p['invoice_number'] ?? '—'); ?></td>
                         <td>
@@ -551,7 +673,7 @@ $today = date('Y-m-d H:i');
                     </tr>
                 <?php endforeach; ?>
             <?php else: ?>
-                <tr class="empty-row"><td colspan="6">هیڅ تادیه نشته</td></tr>
+                <tr class="empty-row"><td colspan="7">هیڅ تادیه نشته</td></tr>
             <?php endif; ?>
         </tbody>
     </table>

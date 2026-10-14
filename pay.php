@@ -33,120 +33,107 @@ if (isset($_SESSION['flash_error'])) {
     unset($_SESSION['flash_error']);
 }
 
-/* ============================================================
-   PHP: Accurate Shamsi (Afghan/Persian) ⇄ Gregorian
-   Kuwaiti algorithm (jalali) — matches JS version
-   ============================================================ */
-function phpDiv($a, $b) { return intval($a / $b); }
-function phpMod($a, $b) { return $a - intval($a / $b) * $b; }
-
-// Shamsi (Jalali) → Gregorian
-function shamsiToGregorianPHP($jy, $jm, $jd) {
-    $jy = (int)$jy; $jm = (int)$jm; $jd = (int)$jd;
-    if ($jy < 1300 || $jy > 1500 || $jm < 1 || $jm > 12 || $jd < 1 || $jd > 31) return null;
-
-    $gy = ($jy <= 979) ? 621 : 1600;
-    $jy -= ($jy <= 979) ? 0 : 979;
-
-    $days = (365 * $jy)
-          + (phpDiv($jy, 33) * 8)
-          + phpDiv(phpMod($jy, 33) + 3, 4)
-          + 78
-          + $jd
-          + (($jm < 7) ? ($jm - 1) * 31 : (($jm - 7) * 30) + 186);
-
-    $gy2 = ($days > 79) ? $gy + 1 : $gy;
-    $days -= ($days > 79) ? 79 : -1 * ($gy2 - $gy) * 365;
-
-    $curY = $gy2;
-    $guard = 0;
-    while ($guard++ < 400) {
-        $isLeap = (($curY % 4 === 0) && ($curY % 100 !== 0 || $curY % 400 === 0));
-        $yearDays = $isLeap ? 366 : 365;
-        if ($days < $yearDays) break;
-        $days -= $yearDays;
-        $curY++;
+// =========================
+// AFGHAN (SOLAR HIJRI) DATE CONVERTER
+// =========================
+function gregorianToAfghan($gy, $gm, $gd) {
+    $g_d_m = [0,31,59,90,120,151,181,212,243,273,304,334];
+    $gy2 = ($gm > 2) ? ($gy + 1) : $gy;
+    $days = 355666 + (365 * $gy) + ((int)(($gy2 + 3) / 4)) - ((int)(($gy2 + 99) / 100)) + ((int)(($gy2 + 399) / 400)) + $gd + $g_d_m[$gm - 1];
+    $jy = -1595 + (33 * ((int)($days / 12053)));
+    $days %= 12053;
+    $jy += 4 * ((int)($days / 1461));
+    $days %= 1461;
+    if ($days > 365) {
+        $jy += (int)(($days - 1) / 365);
+        $days = ($days - 1) % 365;
     }
+    if ($days < 186) {
+        $jm = 1 + (int)($days / 31);
+        $jd = 1 + ($days % 31);
+    } else {
+        $jm = 7 + (int)(($days - 186) / 30);
+        $jd = 1 + (($days - 186) % 30);
+    }
+    return [$jy, $jm, $jd];
+}
 
-    $g_d_m = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    $isLeap = (($curY % 4 === 0) && ($curY % 100 !== 0 || $curY % 400 === 0));
-    if ($isLeap) $g_d_m[2] = 29;
-
-    $gm = 1;
-    while ($gm <= 12) {
-        $dim = $g_d_m[$gm];
-        if ($days < $dim) break;
-        $days -= $dim;
-        $gm++;
+function afghanToGregorian($jy, $jm, $jd) {
+    $jy += 1595;
+    $days = -355668 + (365 * $jy) + (((int)($jy / 33)) * 8) + ((int)((($jy % 33) + 3) / 4)) + $jd + (($jm < 7) ? ($jm - 1) * 31 : (($jm - 7) * 30) + 186);
+    $gy = 400 * ((int)($days / 146097));
+    $days %= 146097;
+    if ($days > 36524) {
+        $gy += 100 * ((int)(--$days / 36524));
+        $days %= 36524;
+        if ($days >= 365) $days++;
+    }
+    $gy += 4 * ((int)($days / 1461));
+    $days %= 1461;
+    if ($days > 365) {
+        $gy += (int)(($days - 1) / 365);
+        $days = ($days - 1) % 365;
     }
     $gd = $days + 1;
-
-    if ($curY < 1900 || $curY > 2200 || $gm < 1 || $gm > 12 || $gd < 1 || $gd > 31) return null;
-    return ['year' => $curY, 'month' => $gm, 'day' => $gd];
+    $sal_a = [0,31,($gy % 4 == 0 && $gy % 100 != 0) || ($gy % 400 == 0) ? 29 : 28,31,30,31,30,31,31,30,31,30,31];
+    for ($gm = 0; $gm < 13 && $gd > $sal_a[$gm]; $gm++) {
+        $gd -= $sal_a[$gm];
+    }
+    return [$gy, $gm, $gd];
 }
 
-// Gregorian → Shamsi (Jalali)
-function gregToShamsiPHP($gy, $gm, $gd) {
-    $gy = (int)$gy; $gm = (int)$gm; $gd = (int)$gd;
-    if ($gy < 1900 || $gy > 2200 || $gm < 1 || $gm > 12 || $gd < 1 || $gd > 31) return null;
-
-    $jy = ($gy <= 1600) ? 0 : 979;
-    $gy -= ($gy <= 1600) ? 621 : 1600;
-    $gy2 = ($gm > 2) ? ($gy + 1) : $gy;
-
-    $days = (365 * $gy)
-          + phpDiv($gy2 + 3, 4)
-          - phpDiv($gy2 + 99, 100)
-          + phpDiv($gy2 + 399, 400)
-          - 80
-          + $gd
-          + [0,31,59,90,120,151,181,212,243,273,304,334][$gm - 1];
-
-    $jy += 1595;
-
-    $j_days = -1 * ($jy * 365)
-            + phpDiv($jy, 33) * 8
-            + phpDiv(phpMod($jy, 33) + 3, 4)
-            + 78
-            + $days;
-
-    if ($j_days < 0) return null;
-
-    $j_np = phpDiv($j_days, 12053);
-    $j_days %= 12053;
-    $jy += 33 * $j_np;
-    $jy += 4 * phpDiv($j_days, 1461);
-    $j_days %= 1461;
-
-    if ($j_days > 365) {
-        $jy += phpDiv($j_days - 1, 365);
-        $j_days = ($j_days - 1) % 365;
-    }
-
-    if ($j_days < 186) {
-        $jm = 1 + phpDiv($j_days, 31);
-        $jd = 1 + phpMod($j_days, 31);
-    } else {
-        $jm = 7 + phpDiv($j_days - 186, 30);
-        $jd = 1 + phpMod($j_days - 186, 30);
-    }
-
-    if ($jy < 1300 || $jy > 1500 || $jm < 1 || $jm > 12 || $jd < 1 || $jd > 31) return null;
-    return ['year' => $jy, 'month' => $jm, 'day' => $jd];
+function formatAfghanDate($gy, $gm, $gd) {
+    return sprintf('%04d/%02d/%02d', $gy, $gm, $gd);
 }
 
-// Afghan month names
-$SHAMSI_MONTHS_PHP = ['حمل','ثور','جوزا','سرطان','اسد','سنبله','میزان','عقرب','قوس','جدي','دلو','حوت'];
-
-/* ============================================================
-   TODAY'S SHAMSI DATE (default for form)
-   ============================================================ */
-$gy = (int)date('Y');
-$gm = (int)date('n');
-$gd = (int)date('j');
-$todayShamsi = gregToShamsiPHP($gy, $gm, $gd);
-if (!$todayShamsi) {
-    $todayShamsi = ['year' => 1400, 'month' => 1, 'day' => 1];
+// =========================
+// AJAX: DATE CONVERTER
+// =========================
+if (isset($_GET['ajax_date_convert'])) {
+    header('Content-Type: application/json');
+    
+    $type = $_GET['type'] ?? '';
+    
+    if ($type === 'to_afghan') {
+        $gy = intval($_GET['gy'] ?? 0);
+        $gm = intval($_GET['gm'] ?? 0);
+        $gd = intval($_GET['gd'] ?? 0);
+        
+        if ($gy <= 0 || $gm <= 0 || $gm > 12 || $gd <= 0 || $gd > 31) {
+            echo json_encode(['success' => false, 'message' => 'Invalid Gregorian date']);
+            exit();
+        }
+        
+        [$jy, $jm, $jd] = gregorianToAfghan($gy, $gm, $gd);
+        echo json_encode([
+            'success' => true,
+            'afghan' => formatAfghanDate($jy, $jm, $jd),
+            'jy' => $jy, 'jm' => $jm, 'jd' => $jd
+        ]);
+        exit();
+    }
+    
+    if ($type === 'to_gregorian') {
+        $jy = intval($_GET['jy'] ?? 0);
+        $jm = intval($_GET['jm'] ?? 0);
+        $jd = intval($_GET['jd'] ?? 0);
+        
+        if ($jy <= 0 || $jm <= 0 || $jm > 12 || $jd <= 0 || $jd > 31) {
+            echo json_encode(['success' => false, 'message' => 'Invalid Afghan date']);
+            exit();
+        }
+        
+        [$gy, $gm, $gd] = afghanToGregorian($jy, $jm, $jd);
+        echo json_encode([
+            'success' => true,
+            'gregorian' => sprintf('%04d-%02d-%02d', $gy, $gm, $gd),
+            'gy' => $gy, 'gm' => $gm, 'gd' => $gd
+        ]);
+        exit();
+    }
+    
+    echo json_encode(['success' => false, 'message' => 'Invalid type']);
+    exit();
 }
 
 // =========================
@@ -287,7 +274,6 @@ if (isset($_GET['delete_id'])) {
 
 // =========================
 // ADD PAYMENT (POST → redirect)
-// Shamsi date received from form → converted to Gregorian → stored
 // =========================
 if (isset($_POST['add_payment'])) {
     $client_id       = intval($_POST['client_id'] ?? 0);
@@ -295,22 +281,11 @@ if (isset($_POST['add_payment'])) {
     $hawala_number   = trim($_POST['hawala_number'] ?? '');
     $currency        = trim($_POST['currency'] ?? '');
     $amount          = trim($_POST['amount'] ?? '');
-    $shamsi_day      = intval($_POST['shamsi_day'] ?? 0);
-    $shamsi_month    = intval($_POST['shamsi_month'] ?? 0);
-    $shamsi_year     = intval($_POST['shamsi_year'] ?? 0);
+    $payment_date    = trim($_POST['payment_date'] ?? '');
     $note            = trim($_POST['note'] ?? '');
     $receiptPicture  = null;
     $notebookPicture = null;
     $hasError        = false;
-
-    // Convert Shamsi → Gregorian for DB
-    $greg = shamsiToGregorianPHP($shamsi_year, $shamsi_month, $shamsi_day);
-    if (!$greg) {
-        $_SESSION['flash_error'] = "نېټه سمه نه ده — شمسي نېټه بېرته وګورئ";
-        header("Location: " . strtok($_SERVER["REQUEST_URI"], '?'));
-        exit();
-    }
-    $payment_date = sprintf('%04d-%02d-%02d', $greg['year'], $greg['month'], $greg['day']);
 
     $allowed_currencies = ['USD', 'AFN'];
 
@@ -323,9 +298,11 @@ if (isset($_POST['add_payment'])) {
     } elseif ($amount === '' || floatval($amount) <= 0) {
         $_SESSION['flash_error'] = "اندازه باید له صفر څخه زیاته وي";
         $hasError = true;
+    } elseif (empty($payment_date)) {
+        $_SESSION['flash_error'] = "نېټه اړینه ده";
+        $hasError = true;
     }
 
-    // ===== RECEIPT PICTURE =====
     if (!$hasError && isset($_FILES['receipt_picture']) && $_FILES['receipt_picture']['error'] === UPLOAD_ERR_OK) {
         $allowed_ext = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         $ext = strtolower(pathinfo($_FILES['receipt_picture']['name'], PATHINFO_EXTENSION));
@@ -338,7 +315,6 @@ if (isset($_POST['add_payment'])) {
         }
     }
 
-    // ===== NOTEBOOK PICTURE =====
     if (!$hasError && isset($_FILES['notebook_picture']) && $_FILES['notebook_picture']['error'] === UPLOAD_ERR_OK) {
         $allowed_ext = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         $ext = strtolower(pathinfo($_FILES['notebook_picture']['name'], PATHINFO_EXTENSION));
@@ -385,10 +361,22 @@ $balSql = "
         COALESCE(inv_afn.total, 0) AS afn_invoiced,
         COALESCE(pay_afn.total, 0) AS afn_paid
     FROM clients c
-    LEFT JOIN (SELECT client_id, SUM(total_amount) AS total FROM sales WHERE currency = 'USD' GROUP BY client_id) inv_usd ON c.id = inv_usd.client_id
-    LEFT JOIN (SELECT client_id, SUM(amount) AS total FROM client_payments WHERE currency = 'USD' GROUP BY client_id) pay_usd ON c.id = pay_usd.client_id
-    LEFT JOIN (SELECT client_id, SUM(total_amount) AS total FROM sales WHERE currency = 'AFN' GROUP BY client_id) inv_afn ON c.id = inv_afn.client_id
-    LEFT JOIN (SELECT client_id, SUM(amount) AS total FROM client_payments WHERE currency = 'AFN' GROUP BY client_id) pay_afn ON c.id = pay_afn.client_id
+    LEFT JOIN (
+        SELECT client_id, SUM(total_amount) AS total 
+        FROM sales WHERE currency = 'USD' GROUP BY client_id
+    ) inv_usd ON c.id = inv_usd.client_id
+    LEFT JOIN (
+        SELECT client_id, SUM(amount) AS total 
+        FROM client_payments WHERE currency = 'USD' GROUP BY client_id
+    ) pay_usd ON c.id = pay_usd.client_id
+    LEFT JOIN (
+        SELECT client_id, SUM(total_amount) AS total 
+        FROM sales WHERE currency = 'AFN' GROUP BY client_id
+    ) inv_afn ON c.id = inv_afn.client_id
+    LEFT JOIN (
+        SELECT client_id, SUM(amount) AS total 
+        FROM client_payments WHERE currency = 'AFN' GROUP BY client_id
+    ) pay_afn ON c.id = pay_afn.client_id
     ORDER BY c.full_name ASC
 ";
 $balResult = $conn->query($balSql);
@@ -488,6 +476,10 @@ if ($salesResult) {
         $sales_list[] = $s;
     }
 }
+
+$today_date = date('Y-m-d');
+list($today_jy, $today_jm, $today_jd) = gregorianToAfghan((int)date('Y'), (int)date('n'), (int)date('j'));
+$today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
 ?>
 <!DOCTYPE html>
 <html lang="ps" dir="rtl">
@@ -576,6 +568,7 @@ if ($salesResult) {
         .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
             outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(30,60,114,0.1);
         }
+        .form-group input[type="date"] { direction: ltr; text-align: right; }
         .form-group input[type="file"] { padding: 8px; }
 
         .compress-hint {
@@ -587,6 +580,136 @@ if ($salesResult) {
             gap: 5px;
         }
         .compress-hint i { color: var(--accent-color); }
+
+        /* ===== DATE CONVERTER ===== */
+        .date-converter {
+            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+            border: 2px solid #7dd3fc;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 18px;
+        }
+        .date-converter .converter-title {
+            font-weight: 700;
+            color: #0369a1;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .date-converter .converter-title i { color: #0ea5e9; }
+        .date-converter-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            align-items: end;
+        }
+        @media (max-width: 480px) {
+            .date-converter-row { grid-template-columns: 1fr; }
+        }
+        .date-field label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #0369a1;
+        }
+        .date-field label i { color: #0ea5e9; margin-left: 4px; }
+        .date-field input[type="date"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #bae6fd;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            background: #ffffff;
+            color: #0c4a6e;
+            transition: var(--transition);
+            direction: ltr;
+            text-align: left;
+            min-height: 44px;
+        }
+        .date-field input[type="date"]:focus {
+            outline: none;
+            border-color: #0ea5e9;
+            box-shadow: 0 0 0 4px rgba(14,165,233,0.15);
+        }
+        .date-field .afghan-date-input {
+            display: flex;
+            gap: 4px;
+        }
+        .date-field .afghan-date-input select {
+            flex: 1;
+            padding: 10px 6px;
+            border: 2px solid #bae6fd;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-family: inherit;
+            background: #ffffff;
+            color: #0c4a6e;
+            transition: var(--transition);
+            text-align: center;
+            min-height: 44px;
+            -webkit-appearance: auto !important;
+            appearance: auto !important;
+            background-image: none !important;
+            padding-right: 6px !important;
+            cursor: pointer;
+        }
+        .date-field .afghan-date-input select:focus {
+            outline: none;
+            border-color: #0ea5e9;
+            box-shadow: 0 0 0 4px rgba(14,165,233,0.15);
+        }
+        .date-sync-hint {
+            font-size: 0.7rem;
+            color: #0369a1;
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 600;
+        }
+        .date-sync-hint i { color: #0ea5e9; font-size: 0.75rem; }
+        .date-converter .converter-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: #0ea5e9;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            margin-right: 6px;
+        }
+
+        /* ===== DUAL DATE CELLS IN TABLE ===== */
+        .date-us-cell {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: 700;
+            color: #1e3c72;
+            font-size: 0.88rem;
+        }
+        .date-us-cell i {
+            color: #16a34a;
+            font-size: 0.72rem;
+        }
+        .date-af-cell {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: 700;
+            color: #991b1b;
+            font-size: 0.88rem;
+        }
+        .date-af-cell i {
+            color: #e6b12e;
+            font-size: 0.72rem;
+        }
 
         /* ===== LIVE BALANCE PANEL ===== */
         .balance-box {
@@ -671,7 +794,6 @@ if ($salesResult) {
         .search-row .form-group { flex: 1; min-width: 160px; margin-bottom: 0; }
         .search-row .btn { width: auto; padding: 12px 24px; }
 
-        /* ===== TABLE SCROLL ===== */
         .table-scroll {
             overflow-x: auto;
             overflow-y: auto;
@@ -685,7 +807,6 @@ if ($salesResult) {
         .table-scroll::-webkit-scrollbar-thumb { background: var(--accent-color); border-radius: 8px; border: 2px solid #f1f5f9; }
         .table-scroll::-webkit-scrollbar-thumb:hover { background: #d4a017; }
 
-        /* ===== SUMMARY SEARCH BAR ===== */
         .summary-search-bar {
             display: flex;
             gap: 12px;
@@ -737,7 +858,6 @@ if ($salesResult) {
             white-space: nowrap;
         }
 
-        /* ===== BALANCE TABLE ===== */
         .balance-table {
             width: 100%;
             border-collapse: collapse;
@@ -862,7 +982,6 @@ if ($salesResult) {
             text-overflow: ellipsis;
         }
 
-        /* ===== PAYMENTS TABLE ===== */
         .table-wrapper {
             overflow-x: auto;
             overflow-y: auto;
@@ -880,7 +999,7 @@ if ($salesResult) {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.92rem;
-            min-width: 900px;
+            min-width: 1100px;
         }
         thead { background: var(--primary-color); }
         thead th { position: sticky; top: 0; z-index: 3; }
@@ -946,67 +1065,6 @@ if ($salesResult) {
         .image-modal img { max-width: 90vw; max-height: 85vh; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); border: 3px solid var(--accent-color); }
         .image-modal-close { position: absolute; top: 20px; right: 25px; background: var(--danger-color); color: white; border: none; width: 48px; height: 48px; border-radius: 50%; font-size: 1.3rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
-        /* ===== SHAMSI DATE PICKER (FORM) ===== */
-        .shamsi-picker {
-            display: grid;
-            grid-template-columns: 1fr 2fr 1.3fr;
-            gap: 8px;
-        }
-        .shamsi-picker select, .shamsi-picker input {
-            width: 100%;
-            padding: 12px 14px;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            font-size: 0.95rem;
-            font-family: inherit;
-            background: var(--card-bg);
-            text-align: center;
-            font-weight: 700;
-            color: var(--primary-color);
-            min-height: 48px;
-        }
-        .shamsi-picker select:focus, .shamsi-picker input:focus {
-            outline: none; border-color: var(--primary-color);
-            box-shadow: 0 0 0 4px rgba(30,60,114,0.1);
-        }
-        .shamsi-picker select {
-            -webkit-appearance: none !important;
-            appearance: none !important;
-            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%231e3c72' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>") !important;
-            background-repeat: no-repeat !important;
-            background-position: left 10px center !important;
-            background-size: 14px !important;
-            padding-left: 30px !important;
-            cursor: pointer;
-        }
-        .shamsi-hint {
-            margin-top: 6px;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .shamsi-hint i { color: var(--accent-color); }
-        .shamsi-hint strong { color: var(--primary-color); }
-
-        .shamsi-date-display {
-            font-weight: 700;
-            color: var(--primary-color);
-            direction: rtl;
-            font-size: 0.92rem;
-        }
-        .shamsi-date-month {
-            display: inline-block;
-            background: #fef3c7;
-            color: #92400e;
-            padding: 1px 6px;
-            border-radius: 6px;
-            font-size: 0.72rem;
-            font-weight: 700;
-            margin-right: 4px;
-        }
-
         @media (max-width: 768px) {
             .page-header h1 { font-size: 1.4rem; }
             .stat-info p { font-size: 1.15rem; }
@@ -1016,7 +1074,6 @@ if ($salesResult) {
             .form-group select { width: 100% !important; font-size: 16px !important; }
             .balance-table tbody td, .balance-table thead th { font-size: 0.78rem; padding: 8px 6px; }
             .btn-bill-print { padding: 5px 8px; font-size: 0.7rem; }
-            .shamsi-picker { grid-template-columns: 1fr 1.6fr 1fr; }
         }
     </style>
 </head>
@@ -1248,36 +1305,37 @@ if ($salesResult) {
                     <input type="number" name="amount" id="amountInput" step="0.01" placeholder="0.00" required>
                 </div>
 
-                <!-- ===== SHAMSI (AFGHAN) DATE PICKER — defaults to TODAY ===== -->
-                <div class="form-group">
-                    <label><i class="fas fa-calendar"></i> نېټه (شمسي / افغاني) *</label>
-                    <div class="shamsi-picker">
-                        <select name="shamsi_day" id="shamsiDay" required>
-                            <?php for ($d = 1; $d <= 31; $d++): ?>
-                                <option value="<?php echo $d; ?>" <?php echo ($d == $todayShamsi['day']) ? 'selected' : ''; ?>>
-                                    <?php echo $d; ?>
-                                </option>
-                            <?php endfor; ?>
-                        </select>
-
-                        <select name="shamsi_month" id="shamsiMonth" required>
-                            <?php for ($m = 1; $m <= 12; $m++): ?>
-                                <option value="<?php echo $m; ?>" <?php echo ($m == $todayShamsi['month']) ? 'selected' : ''; ?>>
-                                    <?php echo $SHAMSI_MONTHS_PHP[$m-1]; ?>
-                                </option>
-                            <?php endfor; ?>
-                        </select>
-
-                        <input type="number" name="shamsi_year" id="shamsiYear"
-                               min="1300" max="1500"
-                               value="<?php echo $todayShamsi['year']; ?>"
-                               required>
+                <!-- ===== DATE CONVERTER ===== -->
+                <div class="date-converter">
+                    <div class="converter-title">
+                        <i class="fas fa-calendar-alt"></i>
+                        نیټه (دواړه تقویمونه)
+                        <span class="converter-badge"><i class="fas fa-sync-alt"></i> اتومات تړاو</span>
                     </div>
-                    <div class="shamsi-hint">
+                    <div class="date-converter-row">
+                        <div class="date-field">
+                            <label><i class="fas fa-globe"></i> میادي (US)</label>
+                            <input type="date" 
+                                   id="gregorianDateInput" 
+                                   value="<?php echo $today_date; ?>">
+                        </div>
+                        <div class="date-field">
+                            <label><i class="fas fa-moon"></i> هجري شمسي (افغاني)</label>
+                            <div class="afghan-date-input">
+                                <select id="afghanYearSelect"></select>
+                                <select id="afghanMonthSelect"></select>
+                                <select id="afghanDaySelect"></select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="date-sync-hint">
                         <i class="fas fa-info-circle"></i>
-                        <span>نننۍ افغاني نېټه: <strong><?php echo $todayShamsi['year']; ?>/<?php echo sprintf('%02d', $todayShamsi['month']); ?>/<?php echo sprintf('%02d', $todayShamsi['day']); ?></strong> (<?php echo $SHAMSI_MONTHS_PHP[$todayShamsi['month']-1]; ?>)</span>
+                        یو تقویم بدل کړئ، بل به اتومات ډک شي
                     </div>
                 </div>
+
+                <!-- Hidden input for the actual payment_date sent to server -->
+                <input type="hidden" name="payment_date" id="paymentDateHidden" value="<?php echo $today_date; ?>">
 
                 <div class="form-group">
                     <label><i class="fas fa-image"></i> د رسید عکس (اختیاري)</label>
@@ -1357,27 +1415,28 @@ if ($salesResult) {
                             <th>فاکتور</th>
                             <th>ډول</th>
                             <th>اندازه</th>
-                            <th>نېټه (شمسي)</th>
+                            <th>میادي نېټه<br><small style="font-weight:400;opacity:0.85;">(US)</small></th>
+                            <th>افغاني نېټه<br><small style="font-weight:400;opacity:0.85;">(هجري شمسي)</small></th>
                             <th>عکسونه</th>
                             <th>کړنې</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (mysqli_num_rows($result) > 0): ?>
-                            <?php while ($row = mysqli_fetch_assoc($result)): 
-                                $shamsiDisplay = '—';
-                                $monthName = '';
-                                if (!empty($row['payment_date']) && $row['payment_date'] !== '0000-00-00') {
-                                    $parts = explode('-', $row['payment_date']);
+                            <?php while ($row = mysqli_fetch_assoc($result)): ?>
+                                <?php
+                                // Convert stored Gregorian date to Afghan date
+                                $pd = $row['payment_date'];
+                                $afghan_date_display = '—';
+                                if (!empty($pd) && $pd !== '0000-00-00') {
+                                    $parts = explode('-', $pd);
                                     if (count($parts) === 3) {
-                                        $s = gregToShamsiPHP((int)$parts[0], (int)$parts[1], (int)$parts[2]);
-                                        if ($s) {
-                                            $shamsiDisplay = sprintf('%04d/%02d/%02d', $s['year'], $s['month'], $s['day']);
-                                            $monthName = $SHAMSI_MONTHS_PHP[$s['month']-1];
-                                        }
+                                        [$pgy, $pgm, $pgd] = [(int)$parts[0], (int)$parts[1], (int)$parts[2]];
+                                        [$pjy, $pjm, $pjd] = gregorianToAfghan($pgy, $pgm, $pgd);
+                                        $afghan_date_display = sprintf('%04d/%02d/%02d', $pjy, $pjm, $pjd);
                                     }
                                 }
-                            ?>
+                                ?>
                                 <tr>
                                     <td><span class="id-badge">#<?php echo $row['id']; ?></span></td>
                                     <td><?php echo htmlspecialchars($row['client_name'] ?? '—'); ?></td>
@@ -1396,10 +1455,16 @@ if ($salesResult) {
                                     </td>
                                     <td class="amount-cell"><?php echo number_format($row['amount'], 2); ?></td>
                                     <td>
-                                        <span class="shamsi-date-display"><?php echo $shamsiDisplay; ?></span>
-                                        <?php if ($monthName): ?>
-                                            <span class="shamsi-date-month"><?php echo $monthName; ?></span>
-                                        <?php endif; ?>
+                                        <span class="date-us-cell">
+                                            <i class="fas fa-globe"></i>
+                                            <?php echo htmlspecialchars($row['payment_date']); ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="date-af-cell">
+                                            <i class="fas fa-moon"></i>
+                                            <?php echo htmlspecialchars($afghan_date_display); ?>
+                                        </span>
                                     </td>
                                     <td>
                                         <?php if (!empty($row['receipt_picture']) && file_exists(__DIR__ . '/' . $row['receipt_picture'])): ?>
@@ -1434,7 +1499,7 @@ if ($salesResult) {
                             <?php endwhile; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="9">
+                                <td colspan="10">
                                     <div class="empty-state">
                                         <i class="fas fa-inbox"></i>
                                         د دې فلټر لپاره هیڅ تادیه ونه موندل شوه.
@@ -1469,6 +1534,132 @@ if ($salesResult) {
 </div>
 
 <script>
+    // ============================================
+    // AFGHAN DATE CONVERTER
+    // ============================================
+    const AFGHAN_MONTHS = [
+        'حمل', 'ثور', 'جوزا', 'سرطان', 'اسد', 'سنبله',
+        'میزان', 'عقرب', 'قوس', 'جدی', 'دلو', 'حوت'
+    ];
+
+    const gregorianDateInput = document.getElementById('gregorianDateInput');
+    const afghanYearSelect = document.getElementById('afghanYearSelect');
+    const afghanMonthSelect = document.getElementById('afghanMonthSelect');
+    const afghanDaySelect = document.getElementById('afghanDaySelect');
+    const paymentDateHidden = document.getElementById('paymentDateHidden');
+
+    function populateAfghanYears() {
+        const currentYear = parseInt('<?php echo $today_jy; ?>');
+        afghanYearSelect.innerHTML = '';
+        for (let y = currentYear - 30; y <= currentYear + 30; y++) {
+            const opt = document.createElement('option');
+            opt.value = y;
+            opt.textContent = y;
+            afghanYearSelect.appendChild(opt);
+        }
+    }
+
+    function populateAfghanMonths() {
+        afghanMonthSelect.innerHTML = '';
+        AFGHAN_MONTHS.forEach((name, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx + 1;
+            opt.textContent = (idx + 1) + ' - ' + name;
+            afghanMonthSelect.appendChild(opt);
+        });
+    }
+
+    function populateAfghanDays(jy, jm, selectedDay) {
+        afghanDaySelect.innerHTML = '';
+        let maxDays;
+        if (jm <= 6) maxDays = 31;
+        else if (jm <= 11) maxDays = 30;
+        else {
+            const isLeap = ((jy % 33) % 4 === 1);
+            maxDays = isLeap ? 30 : 29;
+        }
+        for (let d = 1; d <= maxDays; d++) {
+            const opt = document.createElement('option');
+            opt.value = d;
+            opt.textContent = d;
+            afghanDaySelect.appendChild(opt);
+        }
+        if (selectedDay && selectedDay <= maxDays) {
+            afghanDaySelect.value = selectedDay;
+        }
+    }
+
+    function syncToAfghan() {
+        const val = gregorianDateInput.value;
+        if (!val) return;
+        const [gy, gm, gd] = val.split('-').map(Number);
+
+        fetch('?ajax_date_convert=1&type=to_afghan&gy=' + gy + '&gm=' + gm + '&gd=' + gd)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) return;
+                afghanYearSelect.value = data.jy;
+                afghanMonthSelect.value = data.jm;
+                populateAfghanDays(data.jy, data.jm, data.jd);
+                afghanDaySelect.value = data.jd;
+                paymentDateHidden.value = val;
+            })
+            .catch(err => console.error('Date convert error:', err));
+    }
+
+    function syncToGregorian() {
+        const jy = parseInt(afghanYearSelect.value);
+        const jm = parseInt(afghanMonthSelect.value);
+        const jd = parseInt(afghanDaySelect.value);
+
+        if (!jy || !jm || !jd) return;
+
+        fetch('?ajax_date_convert=1&type=to_gregorian&jy=' + jy + '&jm=' + jm + '&jd=' + jd)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) return;
+                gregorianDateInput.value = data.gregorian;
+                paymentDateHidden.value = data.gregorian;
+            })
+            .catch(err => console.error('Date convert error:', err));
+    }
+
+    gregorianDateInput.addEventListener('change', syncToAfghan);
+
+    afghanYearSelect.addEventListener('change', function() {
+        populateAfghanDays(
+            parseInt(afghanYearSelect.value),
+            parseInt(afghanMonthSelect.value),
+            parseInt(afghanDaySelect.value)
+        );
+        syncToGregorian();
+    });
+    afghanMonthSelect.addEventListener('change', function() {
+        populateAfghanDays(
+            parseInt(afghanYearSelect.value),
+            parseInt(afghanMonthSelect.value),
+            parseInt(afghanDaySelect.value)
+        );
+        syncToGregorian();
+    });
+    afghanDaySelect.addEventListener('change', syncToGregorian);
+
+    (function initDateConverter() {
+        populateAfghanYears();
+        populateAfghanMonths();
+
+        const initJy = parseInt('<?php echo $today_jy; ?>');
+        const initJm = parseInt('<?php echo $today_jm; ?>');
+        const initJd = parseInt('<?php echo $today_jd; ?>');
+
+        afghanYearSelect.value = initJy;
+        afghanMonthSelect.value = initJm;
+        populateAfghanDays(initJy, initJm, initJd);
+        afghanDaySelect.value = initJd;
+
+        paymentDateHidden.value = gregorianDateInput.value;
+    })();
+
     // ============================================
     // IMAGE COMPRESSION
     // ============================================
@@ -1538,7 +1729,6 @@ if ($salesResult) {
         });
     }
 
-    // ===== Compress all file inputs on submit =====
     (function() {
         const form = document.getElementById('paymentForm');
         const submitBtn = document.getElementById('paymentSubmitBtn');
@@ -1571,6 +1761,7 @@ if ($salesResult) {
                         const dt = new DataTransfer();
                         dt.items.add(compressed);
                         input.files = dt.files;
+                        console.log(`✅ ${input.name}: ${(original.size/1024).toFixed(1)}KB → ${(compressed.size/1024).toFixed(1)}KB`);
                     }
 
                     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> خوندي کیږي...';
@@ -1622,6 +1813,7 @@ if ($salesResult) {
     const saleSelect = document.getElementById('saleSelect');
 
     let currentBalance = null;
+
     const AJAX_URL = window.location.pathname;
 
     function showError(msg) {
@@ -1657,16 +1849,21 @@ if ($salesResult) {
             .then(response => response.text())
             .then(text => {
                 balanceLoading.classList.remove('active');
+
                 let data;
-                try { data = JSON.parse(text); }
-                catch (e) {
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
                     showError('Server did not return JSON.');
+                    console.error('Raw response:', text);
                     return;
                 }
+
                 if (!data.success) {
                     showError(data.message || 'Unknown error');
                     return;
                 }
+
                 currentBalance = data;
                 renderBalance(data, 0);
                 balanceBox.classList.add('active');
@@ -1700,9 +1897,19 @@ if ($salesResult) {
 
         if (payAmount > 0) {
             if (isOverpaid) {
-                html += `<div class="balance-row overpaid"><span class="label">⚠️ اضافه تادیه</span><span class="value">${Math.abs(remaining).toLocaleString('en-US', {minimumFractionDigits: 2})} ${currencySymbol}</span></div>`;
+                html += `
+                    <div class="balance-row overpaid">
+                        <span class="label">⚠️ اضافه تادیه</span>
+                        <span class="value">${Math.abs(remaining).toLocaleString('en-US', {minimumFractionDigits: 2})} ${currencySymbol}</span>
+                    </div>
+                `;
             } else {
-                html += `<div class="balance-row remaining"><span class="label">✓ د تادیې وروسته پاتې</span><span class="value">${remaining.toLocaleString('en-US', {minimumFractionDigits: 2})} ${currencySymbol}</span></div>`;
+                html += `
+                    <div class="balance-row remaining">
+                        <span class="label">✓ د تادیې وروسته پاتې</span>
+                        <span class="value">${remaining.toLocaleString('en-US', {minimumFractionDigits: 2})} ${currencySymbol}</span>
+                    </div>
+                `;
             }
         }
 
@@ -1726,17 +1933,22 @@ if ($salesResult) {
             const invCurrency = opt.dataset.currency;
             const invClient = opt.dataset.client;
 
-            if (invCurrency === 'USD' || invCurrency === 'AFN') currencySelect.value = invCurrency;
-            if (invClient) clientSelect.value = invClient;
+            if (invCurrency === 'USD' || invCurrency === 'AFN') {
+                currencySelect.value = invCurrency;
+            }
+            if (invClient) {
+                clientSelect.value = invClient;
+            }
             fetchBalance();
         });
     }
 
-    // ===== SEARCH IN CLIENT BALANCES =====
+    // ===== SEARCH IN CLIENT BALANCES TABLE =====
     function filterClientRows() {
         const searchValue = document.getElementById('clientSearchInput').value.toLowerCase().trim();
         const rows = document.querySelectorAll('#balanceTableBody tr.client-row');
         let visibleCount = 0;
+
         rows.forEach(row => {
             const name = row.getAttribute('data-client-name') || '';
             if (searchValue === '' || name.includes(searchValue)) {
@@ -1746,6 +1958,7 @@ if ($salesResult) {
                 row.style.display = 'none';
             }
         });
+
         document.getElementById('visibleCount').textContent = visibleCount;
     }
 </script>
