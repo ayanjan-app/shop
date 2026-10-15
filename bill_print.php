@@ -171,6 +171,15 @@ $today_afghan = formatAfghanDateFromGregorian(date('Y-m-d'));
         background: #f1f5f9;
         transform: translateY(-2px);
     }
+    .btn-share {
+        background: linear-gradient(135deg, #25D366, #128C7E);
+        color: white;
+    }
+    .btn-share:hover {
+        background: linear-gradient(135deg, #1da851, #0e6b5e);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(37,211,102,0.35);
+    }
 
     /* ===== BILL ===== */
     .bill {
@@ -533,6 +542,9 @@ $today_afghan = formatAfghanDateFromGregorian(date('Y-m-d'));
         <a href="pay.php" class="btn-back">
             <i class="fas fa-arrow-right"></i> بیرته
         </a>
+        <button onclick="shareBill()" class="btn-share">
+            <i class="fas fa-share-alt"></i> شریکول
+        </button>
         <button onclick="window.print()" class="btn-print">
             <i class="fas fa-print"></i> بیل چاپ کړئ
         </button>
@@ -748,6 +760,120 @@ $today_afghan = formatAfghanDateFromGregorian(date('Y-m-d'));
         window.addEventListener('load', function() {
             setTimeout(function() { window.print(); }, 400);
         });
+    }
+
+    // Share bill function
+    function shareBill() {
+        const clientName = <?php echo json_encode($client['full_name']); ?>;
+        const billNumber = 'BILL-<?php echo str_pad($client['id'], 5, '0', STR_PAD_LEFT); ?>';
+        const usdUnpaid = '<?php echo number_format($usd['unpaid'], 2); ?>';
+        const afnUnpaid = '<?php echo number_format($afn['unpaid'], 2); ?>';
+        const usdPaid = '<?php echo number_format($usd['paid'], 2); ?>';
+        const afnPaid = '<?php echo number_format($afn['paid'], 2); ?>';
+        const usdInvoiced = '<?php echo number_format($usd['invoiced'], 2); ?>';
+        const afnInvoiced = '<?php echo number_format($afn['invoiced'], 2); ?>';
+        const today = '<?php echo $today; ?>';
+        const todayAfghan = '<?php echo $today_afghan; ?>';
+
+        const shareText = 
+            '📄 د بیل معلومات\n' +
+            '━━━━━━━━━━━━━━━━━━\n' +
+            '👤 پیرودونکی: ' + clientName + '\n' +
+            '🔢 د بیل شمېره: ' + billNumber + '\n' +
+            '📅 نېټه: ' + today + ' | ' + todayAfghan + '\n' +
+            '━━━━━━━━━━━━━━━━━━\n' +
+            '💵 ډالر (USD)\n' +
+            '   ټول فاکتورونه: ' + usdInvoiced + ' $\n' +
+            '   تادیه شوي: ' + usdPaid + ' $\n' +
+            '   پاتې: ' + usdUnpaid + ' $\n' +
+            '━━━━━━━━━━━━━━━━━━\n' +
+            '💴 افغاني (AFN)\n' +
+            '   ټول فاکتورونه: ' + afnInvoiced + ' ؋\n' +
+            '   تادیه شوي: ' + afnPaid + ' ؋\n' +
+            '   پاتې: ' + afnUnpaid + ' ؋\n' +
+            '━━━━━━━━━━━━━━━━━━\n' +
+            '🏪 قرطاسیه — د دفترونو توکي';
+
+        if (navigator.share) {
+            // Use native Web Share API (works on mobile — WhatsApp, Facebook, etc.)
+            navigator.share({
+                title: 'د بیل معلومات — ' + clientName,
+                text: shareText
+            }).catch(function(err) {
+                console.log('Share cancelled or failed:', err);
+            });
+        } else {
+            // Fallback: show a modal with sharing options
+            showShareFallback(shareText, clientName, billNumber);
+        }
+    }
+
+    function showShareFallback(shareText, clientName, billNumber) {
+        // Remove existing modal if any
+        const existing = document.getElementById('shareModal');
+        if (existing) existing.remove();
+
+        const encodedText = encodeURIComponent(shareText);
+        const encodedTitle = encodeURIComponent('د بیل معلومات — ' + clientName);
+
+        const modal = document.createElement('div');
+        modal.id = 'shareModal';
+        modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;';
+        modal.innerHTML = 
+            '<div style="background:#fff;border-radius:16px;padding:25px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;">' +
+                '<h3 style="margin:0 0 8px;color:#1e3c72;font-size:1.15rem;">📤 بیل شریک کړئ</h3>' +
+                '<p style="margin:0 0 20px;color:#64748b;font-size:0.85rem;">د شریکولو لپاره یو اپلیکیشن غوره کړئ</p>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px;">' +
+                    '<a href="https://wa.me/?text=' + encodedText + '" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;background:#25D366;color:#fff;border-radius:10px;text-decoration:none;font-weight:700;font-size:0.9rem;">' +
+                        '<i class="fab fa-whatsapp" style="font-size:1.2rem;"></i> WhatsApp' +
+                    '</a>' +
+                    '<a href="https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(window.location.href) + '&quote=' + encodedText + '" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;background:#1877F2;color:#fff;border-radius:10px;text-decoration:none;font-weight:700;font-size:0.9rem;">' +
+                        '<i class="fab fa-facebook-f" style="font-size:1.2rem;"></i> Facebook' +
+                    '</a>' +
+                    '<a href="https://t.me/share/url?url=' + encodeURIComponent(window.location.href) + '&text=' + encodedText + '" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;background:#0088cc;color:#fff;border-radius:10px;text-decoration:none;font-weight:700;font-size:0.9rem;">' +
+                        '<i class="fab fa-telegram-plane" style="font-size:1.2rem;"></i> Telegram' +
+                    '</a>' +
+                    '<a href="https://twitter.com/intent/tweet?text=' + encodedText + '" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;background:#1DA1F2;color:#fff;border-radius:10px;text-decoration:none;font-weight:700;font-size:0.9rem;">' +
+                        '<i class="fab fa-twitter" style="font-size:1.2rem;"></i> Twitter' +
+                    '</a>' +
+                '</div>' +
+                '<button onclick="copyShareText()" style="width:100%;padding:12px;background:#f1f5f9;color:#1e3c72;border:2px solid #cbd5e1;border-radius:10px;font-weight:700;font-size:0.9rem;cursor:pointer;margin-bottom:10px;font-family:inherit;">' +
+                    '<i class="fas fa-copy"></i> متن کاپي کړئ' +
+                '</button>' +
+                '<button onclick="document.getElementById(\'shareModal\').remove()" style="width:100%;padding:12px;background:#1e3c72;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:0.9rem;cursor:pointer;font-family:inherit;">' +
+                    'بندول' +
+                '</button>' +
+                '<p id="copyStatus" style="margin:10px 0 0;color:#16a34a;font-size:0.8rem;font-weight:600;display:none;">✓ کاپي شو!</p>' +
+            '</div>';
+
+        document.body.appendChild(modal);
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) modal.remove();
+        });
+
+        window._shareText = shareText;
+    }
+
+    function copyShareText() {
+        const text = window._shareText || '';
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function() {
+                const status = document.getElementById('copyStatus');
+                if (status) { status.style.display = 'block'; setTimeout(function(){ status.style.display = 'none'; }, 2000); }
+            });
+        } else {
+            // Fallback for older browsers
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            const status = document.getElementById('copyStatus');
+            if (status) { status.style.display = 'block'; setTimeout(function(){ status.style.display = 'none'; }, 2000); }
+        }
     }
 </script>
 
