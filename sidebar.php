@@ -424,7 +424,7 @@ $is_admin = ($current_user === 'admin');
                 <a href="client.php"><i class="fas fa-users"></i> مشتریان</a>
             </li>
             <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'pay.php' ? 'active' : ''; ?>">
-                <a href="pay.php"><i class="fas fa-boxes"></i> قرض اضافه کړئ</a>
+                <a href="pay.php"><i class="fas fa-boxes"></i>  اصول شوی روپی</a>
             </li>
              
             <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'sale.php' ? 'active' : ''; ?>">
