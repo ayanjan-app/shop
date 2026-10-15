@@ -276,9 +276,6 @@ $today_afghan = formatAfghanDateFromGregorian(date('Y-m-d'));
         gap: 15px;
         margin-bottom: 25px;
     }
-    @media (max-width: 600px) {
-        .summary-cards { grid-template-columns: 1fr; }
-    }
     .summary-card {
         border-radius: 12px;
         padding: 16px 18px;
@@ -342,12 +339,18 @@ $today_afghan = formatAfghanDateFromGregorian(date('Y-m-d'));
         color: #e6b12e;
     }
 
+    /* ===== TABLE SCROLL WRAPPER (mobile) ===== */
+    .table-scroll {
+        width: 100%;
+        margin-bottom: 25px;
+    }
+
     /* ===== TABLES ===== */
     .bill-table {
         width: 100%;
         border-collapse: collapse;
         font-size: 0.85rem;
-        margin-bottom: 25px;
+        margin-bottom: 0;
         border-radius: 10px;
         overflow: hidden;
         border: 1px solid #e2e8f0;
@@ -444,6 +447,44 @@ $today_afghan = formatAfghanDateFromGregorian(date('Y-m-d'));
         font-size: 0.9rem;
     }
 
+    /* ===== MOBILE FIX ===== */
+    @media (max-width: 600px) {
+        .summary-cards { grid-template-columns: 1fr; }
+        .bill { padding: 18px 12px; }
+
+        .table-scroll {
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+            scrollbar-color: #1e3c72 #e2e8f0;
+            scrollbar-gutter: stable;
+            padding-bottom: 6px;
+            margin-bottom: 25px;
+        }
+        .table-scroll::-webkit-scrollbar {
+            height: 8px;
+            display: block;
+        }
+        .table-scroll::-webkit-scrollbar-track {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+        .table-scroll::-webkit-scrollbar-thumb {
+            background: #1e3c72;
+            border-radius: 10px;
+        }
+        .table-scroll::-webkit-scrollbar-thumb:hover {
+            background: #16a34a;
+        }
+
+        .bill-table {
+            min-width: 600px;
+            margin-bottom: 0;
+        }
+        .dual-date-cell { white-space: nowrap; }
+    }
+
     /* ===== PRINT STYLES ===== */
     @media print {
         body {
@@ -468,6 +509,12 @@ $today_afghan = formatAfghanDateFromGregorian(date('Y-m-d'));
         .bill-table thead {
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+        }
+        .table-scroll {
+            overflow: visible !important;
+        }
+        .bill-table {
+            min-width: 0 !important;
         }
         @page {
             margin: 0;
@@ -572,111 +619,115 @@ $today_afghan = formatAfghanDateFromGregorian(date('Y-m-d'));
     <div class="section-title">
         <i class="fas fa-file-invoice"></i> د فاکتورونو لیست (<?php echo count($invList); ?>)
     </div>
-    <table class="bill-table">
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>فاکتور شمېره</th>
-                <th>میادي نېټه<br><small>(US)</small></th>
-                <th>افغاني نېټه<br><small>(هجري شمسي)</small></th>
-                <th>ډول</th>
-                <th>اندازه</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php if (count($invList) > 0): ?>
-                <?php foreach ($invList as $i => $inv): ?>
-                    <tr>
-                        <td><?php echo $i + 1; ?></td>
-                        <td><?php echo htmlspecialchars($inv['invoice_number']); ?></td>
-                        <td>
-                            <span class="dual-date-cell">
-                                <span class="us-date">
-                                    <i class="fas fa-globe"></i>
-                                    <?php echo htmlspecialchars($inv['invoice_date']); ?>
+    <div class="table-scroll">
+        <table class="bill-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>فاکتور شمېره</th>
+                    <th>میادي نېټه<br><small>(US)</small></th>
+                    <th>افغاني نېټه<br><small>(هجري شمسي)</small></th>
+                    <th>ډول</th>
+                    <th>اندازه</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (count($invList) > 0): ?>
+                    <?php foreach ($invList as $i => $inv): ?>
+                        <tr>
+                            <td><?php echo $i + 1; ?></td>
+                            <td><?php echo htmlspecialchars($inv['invoice_number']); ?></td>
+                            <td>
+                                <span class="dual-date-cell">
+                                    <span class="us-date">
+                                        <i class="fas fa-globe"></i>
+                                        <?php echo htmlspecialchars($inv['invoice_date']); ?>
+                                    </span>
                                 </span>
-                            </span>
-                        </td>
-                        <td>
-                            <span class="dual-date-cell">
-                                <span class="af-date">
-                                    <i class="fas fa-moon"></i>
-                                    <?php echo formatAfghanDateFromGregorian($inv['invoice_date']); ?>
+                            </td>
+                            <td>
+                                <span class="dual-date-cell">
+                                    <span class="af-date">
+                                        <i class="fas fa-moon"></i>
+                                        <?php echo formatAfghanDateFromGregorian($inv['invoice_date']); ?>
+                                    </span>
                                 </span>
-                            </span>
-                        </td>
-                        <td>
-                            <span class="badge-<?php echo $inv['currency']; ?>">
-                                <?php echo $inv['currency'] === 'USD' ? 'ډالر' : 'افغاني'; ?>
-                            </span>
-                        </td>
-                        <td class="amt-<?php echo strtolower($inv['currency']); ?>">
-                            <?php echo number_format($inv['total_amount'], 2); ?>
-                            <?php echo $inv['currency'] === 'USD' ? '$' : '؋'; ?>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <tr class="empty-row"><td colspan="6">هیڅ فاکتور نشته</td></tr>
-            <?php endif; ?>
-        </tbody>
-    </table>
+                            </td>
+                            <td>
+                                <span class="badge-<?php echo $inv['currency']; ?>">
+                                    <?php echo $inv['currency'] === 'USD' ? 'ډالر' : 'افغاني'; ?>
+                                </span>
+                            </td>
+                            <td class="amt-<?php echo strtolower($inv['currency']); ?>">
+                                <?php echo number_format($inv['total_amount'], 2); ?>
+                                <?php echo $inv['currency'] === 'USD' ? '$' : '؋'; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr class="empty-row"><td colspan="6">هیڅ فاکتور نشته</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
 
     <!-- PAYMENTS TABLE -->
     <div class="section-title">
         <i class="fas fa-hand-holding-usd"></i> د تادیاتو لیست (<?php echo count($payList); ?>)
     </div>
-    <table class="bill-table">
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>میادي نېټه<br><small>(US)</small></th>
-                <th>افغاني نېټه<br><small>(هجري شمسي)</small></th>
-                <th>حواله</th>
-                <th>فاکتور</th>
-                <th>ډول</th>
-                <th>اندازه</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php if (count($payList) > 0): ?>
-                <?php foreach ($payList as $i => $p): ?>
-                    <tr>
-                        <td><?php echo $i + 1; ?></td>
-                        <td>
-                            <span class="dual-date-cell">
-                                <span class="us-date">
-                                    <i class="fas fa-globe"></i>
-                                    <?php echo htmlspecialchars($p['payment_date']); ?>
+    <div class="table-scroll">
+        <table class="bill-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>میادي نېټه<br><small>(US)</small></th>
+                    <th>افغاني نېټه<br><small>(هجري شمسي)</small></th>
+                    <th>حواله</th>
+                    <th>فاکتور</th>
+                    <th>ډول</th>
+                    <th>اندازه</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (count($payList) > 0): ?>
+                    <?php foreach ($payList as $i => $p): ?>
+                        <tr>
+                            <td><?php echo $i + 1; ?></td>
+                            <td>
+                                <span class="dual-date-cell">
+                                    <span class="us-date">
+                                        <i class="fas fa-globe"></i>
+                                        <?php echo htmlspecialchars($p['payment_date']); ?>
+                                    </span>
                                 </span>
-                            </span>
-                        </td>
-                        <td>
-                            <span class="dual-date-cell">
-                                <span class="af-date">
-                                    <i class="fas fa-moon"></i>
-                                    <?php echo formatAfghanDateFromGregorian($p['payment_date']); ?>
+                            </td>
+                            <td>
+                                <span class="dual-date-cell">
+                                    <span class="af-date">
+                                        <i class="fas fa-moon"></i>
+                                        <?php echo formatAfghanDateFromGregorian($p['payment_date']); ?>
+                                    </span>
                                 </span>
-                            </span>
-                        </td>
-                        <td><?php echo !empty($p['hawala_number']) ? htmlspecialchars($p['hawala_number']) : '—'; ?></td>
-                        <td><?php echo htmlspecialchars($p['invoice_number'] ?? '—'); ?></td>
-                        <td>
-                            <span class="badge-<?php echo $p['currency']; ?>">
-                                <?php echo $p['currency'] === 'USD' ? 'ډالر' : 'افغاني'; ?>
-                            </span>
-                        </td>
-                        <td class="amt-<?php echo strtolower($p['currency']); ?>">
-                            <?php echo number_format($p['amount'], 2); ?>
-                            <?php echo $p['currency'] === 'USD' ? '$' : '؋'; ?>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <tr class="empty-row"><td colspan="7">هیڅ تادیه نشته</td></tr>
-            <?php endif; ?>
-        </tbody>
-    </table>
+                            </td>
+                            <td><?php echo !empty($p['hawala_number']) ? htmlspecialchars($p['hawala_number']) : '—'; ?></td>
+                            <td><?php echo htmlspecialchars($p['invoice_number'] ?? '—'); ?></td>
+                            <td>
+                                <span class="badge-<?php echo $p['currency']; ?>">
+                                    <?php echo $p['currency'] === 'USD' ? 'ډالر' : 'افغاني'; ?>
+                                </span>
+                            </td>
+                            <td class="amt-<?php echo strtolower($p['currency']); ?>">
+                                <?php echo number_format($p['amount'], 2); ?>
+                                <?php echo $p['currency'] === 'USD' ? '$' : '؋'; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr class="empty-row"><td colspan="7">هیڅ تادیه نشته</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
 
     <!-- FOOTER -->
     <div class="bill-footer">

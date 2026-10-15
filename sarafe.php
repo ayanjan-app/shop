@@ -483,7 +483,7 @@ $money_types_list = ['چیني', 'افغاني', 'ډالر'];
         }
 
         #gregorianDateInput{
-            margin-left: -30px;
+            margin-left: 30px
         }
 
         /* ===== DUAL DATE CELLS IN TABLE ===== */

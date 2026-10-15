@@ -507,8 +507,9 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
             --transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Noto Naskh Arabic', 'Segoe UI', Tahoma, sans-serif; }
+        html, body { overflow-x: hidden; }
         body { background: var(--bg-light); color: var(--text-color); min-height: 100vh; font-size: 14px; line-height: 1.6; }
-        .main-content { padding: 5px; }
+        .main-content { padding: 5px; min-width: 0; }
         @media (max-width: 768px) { .main-content { padding: 5px; padding-top: 5px; } }
 
         .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; padding: 18px 24px; background: var(--primary-color); border-radius: var(--border-radius); color: white; box-shadow: var(--shadow); }
@@ -533,8 +534,10 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
 
         .content-grid { display: grid; grid-template-columns: 400px 1fr; gap: 25px; align-items: start; }
         @media (max-width: 1100px) { .content-grid { grid-template-columns: 1fr; } }
+        /* FIX: grid items must be allowed to shrink below their content width */
+        .content-grid > * { min-width: 0; }
 
-        .card { background: var(--card-bg); border-radius: var(--border-radius); padding: 25px; box-shadow: var(--shadow); position: relative; overflow: hidden; border: 1px solid #e2e8f0; margin-bottom: 25px; }
+        .card { background: var(--card-bg); border-radius: var(--border-radius); padding: 25px; box-shadow: var(--shadow); position: relative; overflow: visible; border: 1px solid #e2e8f0; margin-bottom: 25px; min-width: 0; }
         .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--accent-color); }
         .card.full-width { grid-column: 1 / -1; }
         .card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #f1f5f9; }
@@ -581,6 +584,84 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
         }
         .compress-hint i { color: var(--accent-color); }
 
+        /* ===== SEARCHABLE COMBO (input + dropdown) ===== */
+        .combo {
+            position: relative;
+            width: 100%;
+        }
+        .combo input[type="text"] {
+            width: 100%;
+            padding: 12px 44px 12px 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            background: var(--card-bg);
+            color: var(--text-color);
+            text-align: right;
+            min-height: 48px;
+            transition: var(--transition);
+        }
+        .combo input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(30,60,114,0.1);
+        }
+        .combo .combo-arrow {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--primary-color);
+            font-size: 0.85rem;
+            pointer-events: none;
+        }
+        .combo .combo-list {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border: 2px solid var(--primary-color);
+            border-radius: 10px;
+            max-height: 240px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+        }
+        .combo .combo-list.active { display: block; }
+        .combo .combo-list::-webkit-scrollbar { width: 8px; }
+        .combo .combo-list::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
+        .combo .combo-list::-webkit-scrollbar-thumb { background: var(--accent-color); border-radius: 8px; }
+        .combo .combo-item {
+            padding: 10px 14px;
+            cursor: pointer;
+            font-size: 0.92rem;
+            text-align: right;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background 0.15s ease;
+        }
+        .combo .combo-item:last-child { border-bottom: none; }
+        .combo .combo-item:hover,
+        .combo .combo-item.highlight {
+            background: #eff6ff;
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+        .combo .combo-item .combo-sub {
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            margin-right: 8px;
+            font-weight: 600;
+        }
+        .combo .combo-empty {
+            padding: 14px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.88rem;
+        }
+
         /* ===== DATE CONVERTER ===== */
         .date-converter {
             background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
@@ -608,6 +689,7 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
         @media (max-width: 480px) {
             .date-converter-row { grid-template-columns: 1fr; }
         }
+        .date-field { min-width: 0; }
         .date-field label {
             display: block;
             margin-bottom: 5px;
@@ -635,13 +717,17 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
             border-color: #0ea5e9;
             box-shadow: 0 0 0 4px rgba(14,165,233,0.15);
         }
+        /* FIX: equal-width selects that never overflow the container */
         .date-field .afghan-date-input {
-            display: flex;
-            gap: 4px;
+            display: grid;
+            grid-template-columns: 1fr 1.4fr 1fr;
+            gap: 6px;
+            width: 100%;
         }
         .date-field .afghan-date-input select {
-            flex: 1;
-            padding: 10px 6px;
+            width: 100%;
+            min-width: 0;
+            padding: 10px 4px;
             border: 2px solid #bae6fd;
             border-radius: 10px;
             font-size: 0.85rem;
@@ -654,8 +740,9 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
             -webkit-appearance: auto !important;
             appearance: auto !important;
             background-image: none !important;
-            padding-right: 6px !important;
             cursor: pointer;
+            box-sizing: border-box;
+            text-overflow: ellipsis;
         }
         .date-field .afghan-date-input select:focus {
             outline: none;
@@ -798,6 +885,7 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
             overflow-x: auto;
             overflow-y: auto;
             max-height: 300px;
+            max-width: 100%;
             border-radius: 12px;
             border: 1px solid #e2e8f0;
             background: #ffffff;
@@ -986,6 +1074,7 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
             overflow-x: auto;
             overflow-y: auto;
             max-height: 600px;
+            max-width: 100%;
             border-radius: 12px;
             border: 1px solid #e2e8f0;
             background: #ffffff;
@@ -1246,16 +1335,18 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
             <form method="POST" enctype="multipart/form-data" id="paymentForm">
                 <input type="hidden" name="add_payment" value="1">
 
+                <!-- ===== SEARCHABLE CLIENT COMBO ===== -->
                 <div class="form-group">
                     <label><i class="fas fa-user"></i> پیرودونکی *</label>
-                    <select name="client_id" id="clientSelect" required>
-                        <option value="">-- پیرودونکی غوره کړئ --</option>
-                        <?php foreach ($clients_list as $cl): ?>
-                            <option value="<?php echo $cl['id']; ?>">
-                                <?php echo htmlspecialchars($cl['full_name']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <div class="combo" id="clientCombo">
+                        <input type="text"
+                               id="clientComboInput"
+                               placeholder="د پیرودونکي نوم ولیکئ یا له لیست څخه غوره کړئ..."
+                               autocomplete="off">
+                        <i class="fas fa-chevron-down combo-arrow"></i>
+                        <div class="combo-list" id="clientComboList"></div>
+                    </div>
+                    <input type="hidden" name="client_id" id="clientSelect" required>
                 </div>
 
                 <div class="form-group">
@@ -1284,20 +1375,18 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
                     <input type="text" name="hawala_number" placeholder="د حوالې شمېره ولیکئ">
                 </div>
 
+                <!-- ===== SEARCHABLE INVOICE COMBO ===== -->
                 <div class="form-group">
                     <label><i class="fas fa-file-invoice"></i> فاکتور (اختیاري)</label>
-                    <select name="sale_id" id="saleSelect">
-                        <option value="">-- فاکتور سره تړاو نه لري --</option>
-                        <?php foreach ($sales_list as $sl): ?>
-                            <option value="<?php echo $sl['id']; ?>"
-                                    data-client="<?php echo $sl['client_id']; ?>"
-                                    data-currency="<?php echo htmlspecialchars($sl['currency']); ?>">
-                                <?php echo htmlspecialchars($sl['invoice_number']); ?> 
-                                (<?php echo htmlspecialchars($sl['client_name'] ?? ''); ?> - 
-                                <?php echo number_format($sl['total_amount'], 2); ?> <?php echo $sl['currency']; ?>)
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <div class="combo" id="saleCombo">
+                        <input type="text"
+                               id="saleComboInput"
+                               placeholder="فاکتور ولیکئ یا له لیست څخه غوره کړئ..."
+                               autocomplete="off">
+                        <i class="fas fa-chevron-down combo-arrow"></i>
+                        <div class="combo-list" id="saleComboList"></div>
+                    </div>
+                    <input type="hidden" name="sale_id" id="saleSelect">
                 </div>
 
                 <div class="form-group">
@@ -1661,6 +1750,200 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
     })();
 
     // ============================================
+    // SEARCHABLE CLIENT COMBO
+    // ============================================
+    const ALL_CLIENTS = <?php
+        echo json_encode(array_map(function($c){
+            return ['id' => (int)$c['id'], 'name' => $c['full_name']];
+        }, $clients_list), JSON_UNESCAPED_UNICODE);
+    ?>;
+
+    const clientCombo      = document.getElementById('clientCombo');
+    const clientComboInput = document.getElementById('clientComboInput');
+    const clientComboList  = document.getElementById('clientComboList');
+    const clientSelect     = document.getElementById('clientSelect');
+
+    function renderClientList(filterText) {
+        const q = (filterText || '').toLowerCase().trim();
+        let matches;
+        if (q === '') {
+            matches = ALL_CLIENTS.slice(0, 100);
+        } else {
+            matches = ALL_CLIENTS.filter(c => c.name.toLowerCase().includes(q));
+        }
+
+        clientComboList.innerHTML = '';
+
+        if (matches.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'combo-empty';
+            empty.textContent = 'هیڅ پیرودونکی ونه موندل شو';
+            clientComboList.appendChild(empty);
+            return;
+        }
+
+        matches.forEach(c => {
+            const item = document.createElement('div');
+            item.className = 'combo-item';
+            item.dataset.id = c.id;
+            item.innerHTML = `${escapeHtml(c.name)} <span class="combo-sub">#${c.id}</span>`;
+            item.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                selectClient(c.id, c.name);
+            });
+            clientComboList.appendChild(item);
+        });
+    }
+
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, function(m) {
+            return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m];
+        });
+    }
+
+    function selectClient(id, name) {
+        clientComboInput.value = name;
+        clientSelect.value = id;
+        clientComboList.classList.remove('active');
+        fetchBalance();
+    }
+
+    function openClientCombo() {
+        renderClientList(clientComboInput.value);
+        clientComboList.classList.add('active');
+    }
+
+    clientComboInput.addEventListener('focus', openClientCombo);
+    clientComboInput.addEventListener('input', function() {
+        clientSelect.value = '';
+        renderClientList(this.value);
+        clientComboList.classList.add('active');
+        balanceBox.classList.remove('active');
+        currentBalance = null;
+    });
+    clientComboInput.addEventListener('blur', function() {
+        setTimeout(() => clientComboList.classList.remove('active'), 150);
+    });
+    document.addEventListener('click', function(e) {
+        if (!clientCombo.contains(e.target)) {
+            clientComboList.classList.remove('active');
+        }
+    });
+
+    // ============================================
+    // SEARCHABLE INVOICE COMBO
+    // ============================================
+    const ALL_SALES = <?php
+        echo json_encode(array_map(function($s){
+            return [
+                'id' => (int)$s['id'],
+                'invoice' => $s['invoice_number'],
+                'client_id' => (int)$s['client_id'],
+                'client_name' => $s['client_name'] ?? '',
+                'currency' => $s['currency'],
+                'amount' => (float)$s['total_amount']
+            ];
+        }, $sales_list), JSON_UNESCAPED_UNICODE);
+    ?>;
+
+    const saleCombo      = document.getElementById('saleCombo');
+    const saleComboInput = document.getElementById('saleComboInput');
+    const saleComboList  = document.getElementById('saleComboList');
+    const saleSelect     = document.getElementById('saleSelect');
+
+    function saleLabel(s) {
+        const amt = Number(s.amount).toLocaleString('en-US', {minimumFractionDigits: 2});
+        return `${s.invoice} — ${s.client_name} (${amt} ${s.currency})`;
+    }
+
+    function renderSaleList(filterText) {
+        const q = (filterText || '').toLowerCase().trim();
+        let matches;
+        if (q === '') {
+            matches = ALL_SALES.slice(0, 100);
+        } else {
+            matches = ALL_SALES.filter(s =>
+                s.invoice.toLowerCase().includes(q) ||
+                (s.client_name || '').toLowerCase().includes(q)
+            );
+        }
+
+        saleComboList.innerHTML = '';
+
+        // Always include the "no invoice" option at the top
+        const noneItem = document.createElement('div');
+        noneItem.className = 'combo-item';
+        noneItem.dataset.id = '';
+        noneItem.innerHTML = `<span style="color:#94a3b8;">— فاکتور سره تړاو نه لري —</span>`;
+        noneItem.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            selectSale(null, '');
+        });
+        saleComboList.appendChild(noneItem);
+
+        if (matches.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'combo-empty';
+            empty.textContent = 'هیڅ فاکتور ونه موندل شو';
+            saleComboList.appendChild(empty);
+            return;
+        }
+
+        matches.forEach(s => {
+            const item = document.createElement('div');
+            item.className = 'combo-item';
+            item.dataset.id = s.id;
+            item.innerHTML = `${escapeHtml(saleLabel(s))}`;
+            item.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                selectSale(s, s.id);
+            });
+            saleComboList.appendChild(item);
+        });
+    }
+
+    function selectSale(saleOrNull, id) {
+        if (!saleOrNull) {
+            saleComboInput.value = '';
+            saleSelect.value = '';
+            return;
+        }
+        saleComboInput.value = saleLabel(saleOrNull);
+        saleSelect.value = saleOrNull.id;
+
+        // Auto-fill currency + client from the invoice
+        if (saleOrNull.currency === 'USD' || saleOrNull.currency === 'AFN') {
+            currencySelect.value = saleOrNull.currency;
+        }
+        if (saleOrNull.client_id) {
+            clientSelect.value = saleOrNull.client_id;
+            clientComboInput.value = saleOrNull.client_name;
+        }
+        saleComboList.classList.remove('active');
+        fetchBalance();
+    }
+
+    function openSaleCombo() {
+        renderSaleList(saleComboInput.value);
+        saleComboList.classList.add('active');
+    }
+
+    saleComboInput.addEventListener('focus', openSaleCombo);
+    saleComboInput.addEventListener('input', function() {
+        saleSelect.value = '';
+        renderSaleList(this.value);
+        saleComboList.classList.add('active');
+    });
+    saleComboInput.addEventListener('blur', function() {
+        setTimeout(() => saleComboList.classList.remove('active'), 150);
+    });
+    document.addEventListener('click', function(e) {
+        if (!saleCombo.contains(e.target)) {
+            saleComboList.classList.remove('active');
+        }
+    });
+
+    // ============================================
     // IMAGE COMPRESSION
     // ============================================
     async function compressImage(file, maxSizeKB = 50, maxWidth = 800, maxHeight = 800) {
@@ -1802,7 +2085,6 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
     });
 
     // ===== LIVE BALANCE =====
-    const clientSelect = document.getElementById('clientSelect');
     const currencySelect = document.getElementById('currencySelect');
     const amountInput = document.getElementById('amountInput');
     const balanceBox = document.getElementById('balanceBox');
@@ -1810,7 +2092,6 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
     const balanceError = document.getElementById('balanceError');
     const balanceClientName = document.getElementById('balanceClientName');
     const balanceRows = document.getElementById('balanceRows');
-    const saleSelect = document.getElementById('saleSelect');
 
     let currentBalance = null;
 
@@ -1834,7 +2115,7 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
             return;
         }
 
-        const clientName = clientSelect.options[clientSelect.selectedIndex].text;
+        const clientName = clientComboInput.value || '';
         balanceClientName.textContent = clientName;
 
         balanceLoading.classList.add('active');
@@ -1916,7 +2197,6 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
         balanceRows.innerHTML = html;
     }
 
-    clientSelect.addEventListener('change', fetchBalance);
     currencySelect.addEventListener('change', fetchBalance);
 
     amountInput.addEventListener('input', function() {
@@ -1925,23 +2205,6 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
             renderBalance(currentBalance, val);
         }
     });
-
-    if (saleSelect) {
-        saleSelect.addEventListener('change', function() {
-            if (!this.value) return;
-            const opt = this.options[this.selectedIndex];
-            const invCurrency = opt.dataset.currency;
-            const invClient = opt.dataset.client;
-
-            if (invCurrency === 'USD' || invCurrency === 'AFN') {
-                currencySelect.value = invCurrency;
-            }
-            if (invClient) {
-                clientSelect.value = invClient;
-            }
-            fetchBalance();
-        });
-    }
 
     // ===== SEARCH IN CLIENT BALANCES TABLE =====
     function filterClientRows() {

@@ -604,6 +604,84 @@ if ($filter_client > 0) {
         }
         .compress-hint i { color: var(--accent-color); }
 
+        /* ===== SEARCHABLE CLIENT COMBO (input + dropdown) ===== */
+        .client-combo {
+            position: relative;
+            width: 100%;
+        }
+        .client-combo input[type="text"] {
+            width: 100%;
+            padding: 12px 44px 12px 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            background: var(--card-bg);
+            color: var(--text-color);
+            text-align: right;
+            min-height: 48px;
+            transition: var(--transition);
+        }
+        .client-combo input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(30,60,114,0.1);
+        }
+        .client-combo .combo-arrow {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--primary-color);
+            font-size: 0.85rem;
+            pointer-events: none;
+        }
+        .client-combo .combo-list {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border: 2px solid var(--primary-color);
+            border-radius: 10px;
+            max-height: 240px;
+            overflow-y: auto;
+            z-index: 50;
+            display: none;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+        }
+        .client-combo .combo-list.active { display: block; }
+        .client-combo .combo-list::-webkit-scrollbar { width: 8px; }
+        .client-combo .combo-list::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
+        .client-combo .combo-list::-webkit-scrollbar-thumb { background: var(--accent-color); border-radius: 8px; }
+        .client-combo .combo-item {
+            padding: 10px 14px;
+            cursor: pointer;
+            font-size: 0.92rem;
+            text-align: right;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background 0.15s ease;
+        }
+        .client-combo .combo-item:last-child { border-bottom: none; }
+        .client-combo .combo-item:hover,
+        .client-combo .combo-item.highlight {
+            background: #eff6ff;
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+        .client-combo .combo-item .client-id {
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            margin-left: 8px;
+            font-weight: 600;
+        }
+        .client-combo .combo-empty {
+            padding: 14px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.88rem;
+        }
+
         /* ===== DATE CONVERTER ===== */
         .date-converter {
             background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
@@ -631,6 +709,7 @@ if ($filter_client > 0) {
         @media (max-width: 480px) {
             .date-converter-row { grid-template-columns: 1fr; }
         }
+        .date-field { min-width: 0; }
         .date-field label {
             display: block;
             margin-bottom: 5px;
@@ -658,13 +737,17 @@ if ($filter_client > 0) {
             border-color: #0ea5e9;
             box-shadow: 0 0 0 4px rgba(14,165,233,0.15);
         }
+        /* FIX: equal-width selects that never overflow the container */
         .date-field .afghan-date-input {
-            display: flex;
-            gap: 4px;
+            display: grid;
+            grid-template-columns: 1fr 1.4fr 1fr;
+            gap: 6px;
+            width: 100%;
         }
         .date-field .afghan-date-input select {
-            flex: 1;
-            padding: 10px 6px;
+            width: 100%;
+            min-width: 0;
+            padding: 10px 4px;
             border: 2px solid #bae6fd;
             border-radius: 10px;
             font-size: 0.85rem;
@@ -677,8 +760,9 @@ if ($filter_client > 0) {
             -webkit-appearance: auto !important;
             appearance: auto !important;
             background-image: none !important;
-            padding-right: 6px !important;
             cursor: pointer;
+            box-sizing: border-box;
+            text-overflow: ellipsis;
         }
         .date-field .afghan-date-input select:focus {
             outline: none;
@@ -1285,14 +1369,18 @@ if ($filter_client > 0) {
             <form method="POST" enctype="multipart/form-data" id="saleForm">
                 <input type="hidden" name="add_sale" value="1">
 
+                <!-- ===== SEARCHABLE CLIENT COMBO ===== -->
                 <div class="form-group">
                     <label><i class="fas fa-user"></i> پیرودونکی *</label>
-                    <select name="client_id" id="saleClientSelect" required>
-                        <option value="">-- پیرودونکی غوره کړئ --</option>
-                        <?php foreach ($clients_list as $cl): ?>
-                            <option value="<?php echo $cl['id']; ?>"><?php echo htmlspecialchars($cl['full_name']); ?></option>
-                        <?php endforeach; ?>
-                    </select>
+                    <div class="client-combo" id="clientCombo">
+                        <input type="text"
+                               id="clientSearchInputCombo"
+                               placeholder="د پیرودونکي نوم ولیکئ یا له لیست څخه غوره کړئ..."
+                               autocomplete="off">
+                        <i class="fas fa-chevron-down combo-arrow"></i>
+                        <div class="combo-list" id="clientComboList"></div>
+                    </div>
+                    <input type="hidden" name="client_id" id="saleClientSelect" required>
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-hashtag"></i> د فاکتور شمېره *</label>
@@ -1595,6 +1683,93 @@ if ($filter_client > 0) {
     })();
 
     // ============================================
+    // SEARCHABLE CLIENT COMBO (input + dropdown)
+    // ============================================
+    const ALL_CLIENTS = <?php
+        echo json_encode(array_map(function($c){
+            return ['id' => (int)$c['id'], 'name' => $c['full_name']];
+        }, $clients_list), JSON_UNESCAPED_UNICODE);
+    ?>;
+
+    const clientCombo        = document.getElementById('clientCombo');
+    const clientComboInput   = document.getElementById('clientSearchInputCombo');
+    const clientComboList    = document.getElementById('clientComboList');
+    const saleClientSelect   = document.getElementById('saleClientSelect');
+
+    function renderComboList(filterText) {
+        const q = (filterText || '').toLowerCase().trim();
+        let matches;
+        if (q === '') {
+            matches = ALL_CLIENTS.slice(0, 100);
+        } else {
+            matches = ALL_CLIENTS.filter(c => c.name.toLowerCase().includes(q));
+        }
+
+        clientComboList.innerHTML = '';
+
+        if (matches.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'combo-empty';
+            empty.textContent = 'هیڅ پیرودونکی ونه موندل شو';
+            clientComboList.appendChild(empty);
+            return;
+        }
+
+        matches.forEach(c => {
+            const item = document.createElement('div');
+            item.className = 'combo-item';
+            item.dataset.id = c.id;
+            item.innerHTML = `${escapeHtml(c.name)} <span class="client-id">#${c.id}</span>`;
+            item.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                selectClient(c.id, c.name);
+            });
+            clientComboList.appendChild(item);
+        });
+    }
+
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, function(m) {
+            return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m];
+        });
+    }
+
+    function selectClient(id, name) {
+        clientComboInput.value = name;
+        saleClientSelect.value = id;
+        clientComboList.classList.remove('active');
+        // Trigger the balance fetch
+        fetchSaleBalance();
+    }
+
+    function openCombo() {
+        renderComboList(clientComboInput.value);
+        clientComboList.classList.add('active');
+    }
+
+    clientComboInput.addEventListener('focus', openCombo);
+    clientComboInput.addEventListener('input', function() {
+        // When typing, reset the selected client_id until a real selection happens
+        saleClientSelect.value = '';
+        renderComboList(this.value);
+        clientComboList.classList.add('active');
+        // Hide the balance box while no valid client is selected
+        saleBalanceBox.classList.remove('active');
+        saleCurrentBalance = null;
+    });
+
+    clientComboInput.addEventListener('blur', function() {
+        // Delay closing so click on item registers
+        setTimeout(() => clientComboList.classList.remove('active'), 150);
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!clientCombo.contains(e.target)) {
+            clientComboList.classList.remove('active');
+        }
+    });
+
+    // ============================================
     // IMAGE COMPRESSION - Compress to ~50KB before upload
     // ============================================
     async function compressImage(file, maxSizeKB = 50, maxWidth = 800, maxHeight = 800) {
@@ -1731,7 +1906,6 @@ if ($filter_client > 0) {
     });
 
     // ===== LIVE BALANCE FOR SALES PAGE =====
-    const saleClientSelect = document.getElementById('saleClientSelect');
     const saleCurrencySelect = document.getElementById('saleCurrencySelect');
     const saleTotalInput = document.getElementById('saleTotalInput');
     const saleBalanceBox = document.getElementById('saleBalanceBox');
@@ -1761,7 +1935,7 @@ if ($filter_client > 0) {
             return;
         }
 
-        const clientName = saleClientSelect.options[saleClientSelect.selectedIndex].text;
+        const clientName = clientComboInput.value || '';
         saleBalanceClientName.textContent = clientName;
 
         saleBalanceLoading.classList.add('active');
@@ -1835,7 +2009,6 @@ if ($filter_client > 0) {
         saleBalanceRows.innerHTML = html;
     }
 
-    saleClientSelect.addEventListener('change', fetchSaleBalance);
     saleCurrencySelect.addEventListener('change', fetchSaleBalance);
 
     saleTotalInput.addEventListener('input', function() {
