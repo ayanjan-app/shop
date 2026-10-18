@@ -1469,8 +1469,49 @@ if ($filter_client > 0) {
                 <h2>د فاکتورونو لیست (<?php echo $record_count; ?>)</h2>
             </div>
 
+            <!-- ===== SIMPLE SEARCH BOX (plain input — filters table rows live) ===== -->
+            <div style="margin-bottom: 16px;">
+                <div style="position: relative;">
+                    <input
+                        type="text"
+                        id="salesTableSearchInput"
+                        placeholder="د پیرودونکي نوم ولیکئ — نتایج به اتوماتیک ښکاره شي..."
+                        autocomplete="off"
+                        oninput="filterSalesRows()"
+                        style="
+                            width: 100%;
+                            padding: 14px 16px 14px 44px;
+                            border: 2px solid #e2e8f0;
+                            border-radius: 10px;
+                            font-size: 0.95rem;
+                            font-family: inherit;
+                            background: #ffffff;
+                            color: #1f2937;
+                            text-align: right;
+                            min-height: 50px;
+                            box-sizing: border-box;
+                            transition: all 0.2s ease;
+                        "
+                        onfocus="this.style.borderColor='#1e3c72'; this.style.boxShadow='0 0 0 4px rgba(30,60,114,0.1)';"
+                        onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';">
+                    <i class="fas fa-search" style="
+                        position: absolute;
+                        left: 16px;
+                        top: 50%;
+                        transform: translateY(-50%);
+                        color: #e6b12e;
+                        font-size: 1rem;
+                        pointer-events: none;
+                    "></i>
+                </div>
+                <div style="margin-top: 8px; font-size: 0.82rem; color: #64748b; font-weight: 600;">
+                    <i class="fas fa-receipt" style="color: #e6b12e;"></i>
+                    <span id="salesVisibleCount"><?php echo $record_count; ?></span> فاکتورونه ښودل کیږي
+                </div>
+            </div>
+
             <div class="table-wrapper">
-                <table class="main-table">
+                <table class="main-table" id="salesTable">
                     <thead>
                         <tr>
                             <th>ID</th>
@@ -1484,10 +1525,11 @@ if ($filter_client > 0) {
                             <th>کړنې</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="salesTableBody">
                         <?php if (mysqli_num_rows($result) > 0): ?>
                             <?php while ($row = mysqli_fetch_assoc($result)): ?>
-                                <tr>
+                                <tr class="sale-row"
+                                    data-search="<?php echo htmlspecialchars(mb_strtolower(($row['client_name'] ?? '') . ' ' . $row['invoice_number'] . ' ' . $row['invoice_date'] . ' ' . formatAfghanDateFromGregorian($row['invoice_date']) . ' ' . $row['currency'] . ' #' . $row['id'], 'UTF-8')); ?>">
                                     <td><span class="id-badge">#<?php echo $row['id']; ?></span></td>
                                     <td><?php echo htmlspecialchars($row['client_name'] ?? '—'); ?></td>
                                     <td><?php echo htmlspecialchars($row['invoice_number']); ?></td>
@@ -2035,6 +2077,29 @@ if ($filter_client > 0) {
         });
 
         document.getElementById('visibleCount').textContent = visibleCount;
+    }
+
+    // ===== SEARCH IN SALES TABLE — type name → rows filter live =====
+    function filterSalesRows() {
+        var input = document.getElementById('salesTableSearchInput');
+        if (!input) return;
+
+        var searchValue = input.value.toLowerCase().trim();
+        var rows = document.querySelectorAll('#salesTableBody tr.sale-row');
+        var visibleCount = 0;
+
+        rows.forEach(function(row) {
+            var searchData = (row.getAttribute('data-search') || '').toLowerCase();
+            if (searchValue === '' || searchData.indexOf(searchValue) !== -1) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        var counter = document.getElementById('salesVisibleCount');
+        if (counter) counter.textContent = visibleCount;
     }
 </script>
 

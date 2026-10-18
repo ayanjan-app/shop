@@ -534,7 +534,6 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
 
         .content-grid { display: grid; grid-template-columns: 400px 1fr; gap: 25px; align-items: start; }
         @media (max-width: 1100px) { .content-grid { grid-template-columns: 1fr; } }
-        /* FIX: grid items must be allowed to shrink below their content width */
         .content-grid > * { min-width: 0; }
 
         .card { background: var(--card-bg); border-radius: var(--border-radius); padding: 25px; box-shadow: var(--shadow); position: relative; overflow: visible; border: 1px solid #e2e8f0; margin-bottom: 25px; min-width: 0; }
@@ -717,7 +716,6 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
             border-color: #0ea5e9;
             box-shadow: 0 0 0 4px rgba(14,165,233,0.15);
         }
-        /* FIX: equal-width selects that never overflow the container */
         .date-field .afghan-date-input {
             display: grid;
             grid-template-columns: 1fr 1.4fr 1fr;
@@ -1494,6 +1492,47 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
                 </form>
             </div>
 
+            <!-- ===== SIMPLE SEARCH BOX (plain input — filters payments table rows live) ===== -->
+            <div style="margin-bottom: 16px;">
+                <div style="position: relative;">
+                    <input
+                        type="text"
+                        id="paymentsTableSearchInput"
+                        placeholder="د پیرودونکي نوم، حواله، فاکتور یا نېټه ولیکئ — نتایج به اتوماتیک ښکاره شي..."
+                        autocomplete="off"
+                        oninput="filterPaymentRows()"
+                        style="
+                            width: 100%;
+                            padding: 14px 16px 14px 44px;
+                            border: 2px solid #e2e8f0;
+                            border-radius: 10px;
+                            font-size: 0.95rem;
+                            font-family: inherit;
+                            background: #ffffff;
+                            color: #1f2937;
+                            text-align: right;
+                            min-height: 50px;
+                            box-sizing: border-box;
+                            transition: all 0.2s ease;
+                        "
+                        onfocus="this.style.borderColor='#1e3c72'; this.style.boxShadow='0 0 0 4px rgba(30,60,114,0.1)';"
+                        onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';">
+                    <i class="fas fa-search" style="
+                        position: absolute;
+                        left: 16px;
+                        top: 50%;
+                        transform: translateY(-50%);
+                        color: #e6b12e;
+                        font-size: 1rem;
+                        pointer-events: none;
+                    "></i>
+                </div>
+                <div style="margin-top: 8px; font-size: 0.82rem; color: #64748b; font-weight: 600;">
+                    <i class="fas fa-receipt" style="color: #e6b12e;"></i>
+                    <span id="paymentsVisibleCount"><?php echo $record_count; ?></span> تادیات ښودل کیږي
+                </div>
+            </div>
+
             <div class="table-wrapper">
                 <table>
                     <thead>
@@ -1510,7 +1549,7 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
                             <th>کړنې</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="paymentsTableBody">
                         <?php if (mysqli_num_rows($result) > 0): ?>
                             <?php while ($row = mysqli_fetch_assoc($result)): ?>
                                 <?php
@@ -1526,7 +1565,8 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
                                     }
                                 }
                                 ?>
-                                <tr>
+                                <tr class="payment-row"
+                                    data-search="<?php echo htmlspecialchars(mb_strtolower(($row['client_name'] ?? '') . ' ' . ($row['hawala_number'] ?? '') . ' ' . ($row['invoice_number'] ?? '') . ' ' . $row['currency'] . ' ' . $row['payment_date'] . ' ' . $afghan_date_display . ' ' . $row['amount'] . ' #' . $row['id'], 'UTF-8')); ?>">
                                     <td><span class="id-badge">#<?php echo $row['id']; ?></span></td>
                                     <td><?php echo htmlspecialchars($row['client_name'] ?? '—'); ?></td>
                                     <td>
@@ -2223,6 +2263,29 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
         });
 
         document.getElementById('visibleCount').textContent = visibleCount;
+    }
+
+    // ===== SEARCH IN PAYMENTS TABLE — type name → rows filter live =====
+    function filterPaymentRows() {
+        var input = document.getElementById('paymentsTableSearchInput');
+        if (!input) return;
+
+        var searchValue = input.value.toLowerCase().trim();
+        var rows = document.querySelectorAll('#paymentsTableBody tr.payment-row');
+        var visibleCount = 0;
+
+        rows.forEach(function(row) {
+            var searchData = (row.getAttribute('data-search') || '').toLowerCase();
+            if (searchValue === '' || searchData.indexOf(searchValue) !== -1) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        var counter = document.getElementById('paymentsVisibleCount');
+        if (counter) counter.textContent = visibleCount;
     }
 </script>
 
