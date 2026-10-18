@@ -223,7 +223,7 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لګښتونه · قرطاسیه</title>
+    <title>لګښتونه · بنجاره پلورنحٔی  </title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -920,7 +920,7 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
     <div class="page-header">
         <div>
             <h1><i class="fas fa-wallet"></i> لګښتونه</h1>
-            <div class="subtitle">د قرطاسیه ټول لګښتونه تعقیب او مدیریت کړئ</div>
+            <div class="subtitle">د     ټول لګښتونه تعقیب او مدیریت کړئ</div>
         </div>
     </div>
 
@@ -1005,7 +1005,7 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
                     </div>
                     <div class="date-converter-row">
                         <div class="date-field">
-                            <label><i class="fas fa-globe"></i> میادي (US)</label>
+                            <label><i class="fas fa-globe"></i> میلادی (US)</label>
                             <input type="date" 
                                    id="gregorianDateInput" 
                                    value="<?php echo $today_date; ?>">
@@ -1089,7 +1089,7 @@ $today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
                             <th>اندازه</th>
                             <th>د څه لپاره</th>
                             <th>کس</th>
-                            <th>میادي نېټه<br><small>(US)</small></th>
+                            <th>میلادی نېټه<br><small>(US)</small></th>
                             <th>افغاني نېټه<br><small>(هجري شمسي)</small></th>
                             <th>کړنې</th>
                         </tr>

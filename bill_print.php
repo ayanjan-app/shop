@@ -561,8 +561,8 @@ $today_afghan = formatAfghanDateFromGregorian(date('Y-m-d'));
                 <i class="fas fa-pen-fancy"></i>
             </div>
             <div class="brand-text">
-                <h1>قرطاسیه</h1>
-                <p>د دفترونو توکي</p>
+                 <h2>حاجی نادر او نقیب حقمل </h1>
+         <p>بنجاره پلورنحٔی  </p>
             </div>
         </div>
         <div class="bill-meta">
@@ -637,7 +637,7 @@ $today_afghan = formatAfghanDateFromGregorian(date('Y-m-d'));
                 <tr>
                     <th>#</th>
                     <th>فاکتور شمېره</th>
-                    <th>میادي نېټه<br><small>(US)</small></th>
+                    <th>میلادي نېټه<br><small>(US)</small></th>
                     <th>افغاني نېټه<br><small>(هجري شمسي)</small></th>
                     <th>ډول</th>
                     <th>اندازه</th>
@@ -692,7 +692,7 @@ $today_afghan = formatAfghanDateFromGregorian(date('Y-m-d'));
             <thead>
                 <tr>
                     <th>#</th>
-                    <th>میادي نېټه<br><small>(US)</small></th>
+                    <th>میلادي نېټه<br><small>(US)</small></th>
                     <th>افغاني نېټه<br><small>(هجري شمسي)</small></th>
                     <th>حواله</th>
                     <th>فاکتور</th>
@@ -747,7 +747,7 @@ $today_afghan = formatAfghanDateFromGregorian(date('Y-m-d'));
             <i class="fas fa-heart"></i> له تاسو سره د کار کولو مننه!
         </div>
         <div>
-            <i class="fas fa-store"></i> قرطاسیه — د دفترونو توکي
+            <i class="fas fa-store"></i> حاجی نادر او نقیب حقمل 
         </div>
     </div>
 
@@ -792,7 +792,7 @@ $today_afghan = formatAfghanDateFromGregorian(date('Y-m-d'));
             '   تادیه شوي: ' + afnPaid + ' ؋\n' +
             '   پاتې: ' + afnUnpaid + ' ؋\n' +
             '━━━━━━━━━━━━━━━━━━\n' +
-            '🏪 قرطاسیه — د دفترونو توکي';
+           
 
         if (navigator.share) {
             // Use native Web Share API (works on mobile — WhatsApp, Facebook, etc.)

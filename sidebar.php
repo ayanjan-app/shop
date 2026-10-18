@@ -455,7 +455,7 @@ $is_admin = ($current_user === 'admin');
             <div class="status-indicator"></div>
             <span>سیسټم فعال</span>
         </div>
-        <p>© <?php echo date('Y'); ?> قرطاسیه</p>
+        <p>© <?php echo date('Y'); ?> بنجاره پلورنحٔی  </p>
         <p>v2.1.0</p>
     </div>
 </div>

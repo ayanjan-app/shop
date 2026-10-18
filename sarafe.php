@@ -279,7 +279,7 @@ $money_types_list = ['چیني', 'افغاني', 'ډالر'];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>صرافي · قرطاسیه</title>
+    <title>صرافي · بنجاره پلورنحٔی  </title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -688,7 +688,7 @@ $money_types_list = ['چیني', 'افغاني', 'ډالر'];
                     </div>
                     <div class="date-converter-row">
                         <div class="date-field">
-                            <label><i class="fas fa-globe"></i> میادي (US)</label>
+                            <label><i class="fas fa-globe"></i> میلادی (US)</label>
                             <input type="date" 
                                    id="gregorianDateInput" 
                                    value="<?php echo $today_date; ?>"  >
@@ -803,7 +803,7 @@ $money_types_list = ['چیني', 'افغاني', 'ډالر'];
                             <th>ID</th>
                             <th>د توکي نوم</th>
                             <th>اندازه</th>
-                            <th>میادي نېټه<br><small>(US)</small></th>
+                            <th>میلادی نېټه<br><small>(US)</small></th>
                             <th>افغاني نېټه<br><small>(هجري شمسي)</small></th>
                             <th>د پیسو ډول</th>
                             <th>یادونه</th>

@@ -199,7 +199,7 @@ $periodLabel = $periodLabels[$period];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ډشبورډ · قرطاسیه</title>
+    <title>ډشبورډ · </title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -627,7 +627,7 @@ $periodLabel = $periodLabels[$period];
     <div class="welcome-header">
         <div class="welcome-text">
             <h1><i class="fas fa-chart-line"></i> ډشبورډ</h1>
-            <p>د قرطاسیه د کاروبار لنډیز — <?php echo htmlspecialchars($periodLabel); ?></p>
+            <p>د  د کاروبار لنډیز — <?php echo htmlspecialchars($periodLabel); ?></p>
         </div>
         <div class="welcome-info">
             <div class="user-chip">
