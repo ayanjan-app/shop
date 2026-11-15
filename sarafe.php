@@ -819,51 +819,136 @@ function h($value) {
             margin-bottom: 10px;
         }
 
-        /* ===== MOBILE TABLE → STACKED CARDS ===== */
+        /* ===== MOBILE TABLE → STACKED CARDS (FIXED) ===== */
         @media (max-width: 800px) {
-            .table-wrapper { border: none; overflow: visible; }
-            table, thead, tbody, th, td, tr { display: block; width: 100%; }
-            thead {
-                position: absolute;
-                top: -9999px;
-                left: -9999px;
+
+            .table-wrapper {
+                border: none;
+                overflow: visible;
+                border-radius: 0;
             }
-            tbody tr {
-                background: var(--card-bg);
+
+            .table-wrapper table {
+                display: block;
+                width: 100%;
+                min-width: 0;
+                border-collapse: separate;
+                border-spacing: 0;
+            }
+
+            .table-wrapper thead {
+                display: none;
+            }
+
+            .table-wrapper tbody {
+                display: block;
+                width: 100%;
+            }
+
+            .table-wrapper tbody tr {
+                display: block;
+                width: 100%;
+                background: #ffffff;
                 border: 1px solid #e2e8f0;
+                border-right: 4px solid var(--primary-color);
                 border-radius: 12px;
-                margin-bottom: 12px;
-                padding: 10px 14px;
-                box-shadow: var(--shadow);
+                margin-bottom: 14px;
+                padding: 6px 14px;
+                box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+                box-sizing: border-box;
             }
-            tbody tr:hover { background: var(--card-bg); }
-            td {
+
+            .table-wrapper tbody tr:hover {
+                background: #ffffff;
+            }
+
+            .table-wrapper tbody td {
                 display: flex;
+                flex-wrap: wrap;
                 justify-content: space-between;
                 align-items: flex-start;
-                gap: 14px;
+                gap: 8px 14px;
+                width: 100%;
+                box-sizing: border-box;
+                padding: 10px 0;
                 text-align: right;
-                padding: 9px 0;
                 border-bottom: 1px dashed #e2e8f0;
-                white-space: normal;
+                white-space: normal !important;
                 word-break: break-word;
                 overflow-wrap: anywhere;
-                min-width: 0;
-                max-width: 100%;
+                font-size: 0.88rem;
+                line-height: 1.5;
             }
-            td:last-child { border-bottom: none; }
-            td::before {
+
+            .table-wrapper tbody td:last-child {
+                border-bottom: none;
+            }
+
+            .table-wrapper tbody td::before {
                 content: attr(data-label);
+                display: inline-block;
                 font-weight: 700;
                 color: var(--text-muted);
-                font-size: 0.78rem;
-                flex-shrink: 0;
-                min-width: 105px;
+                font-size: 0.76rem;
+                flex: 0 0 auto;
+                min-width: 0;
                 text-align: right;
+                white-space: nowrap;
             }
-            td > * { max-width: 100%; }
-            td.note-cell { min-width: 0; max-width: 100%; }
-            .actions { justify-content: flex-start; }
+
+            .table-wrapper tbody td > * {
+                max-width: 100%;
+            }
+
+            /* Notes column full width */
+            .table-wrapper tbody td.note-cell {
+                display: block;
+                min-width: 0;
+                max-width: 100%;
+                white-space: normal;
+                line-height: 1.55;
+                padding: 10px 0;
+            }
+
+            .table-wrapper tbody td.note-cell::before {
+                display: block;
+                margin-bottom: 4px;
+                white-space: normal;
+            }
+
+            /* Actions stack vertically, full-width buttons */
+            .table-wrapper tbody td .actions {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                width: 100%;
+                justify-content: flex-start;
+                align-items: stretch;
+            }
+
+            .table-wrapper tbody td .actions a,
+            .table-wrapper tbody td .actions button {
+                width: 100%;
+                justify-content: center;
+                padding: 9px 12px;
+                font-size: 0.82rem;
+            }
+
+            .table-wrapper tbody td .actions form {
+                width: 100%;
+                margin: 0;
+            }
+
+            /* Empty-state row */
+            .table-wrapper tbody tr td[colspan] {
+                display: block;
+                padding: 0;
+                border: none;
+            }
+
+            .table-wrapper tbody tr td[colspan]::before {
+                display: none;
+            }
         }
 
         @media (max-width: 600px) {
