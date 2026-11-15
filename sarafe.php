@@ -20,35 +20,21 @@ $error = "";
 
 
 // ======================================
-// 1b. AFGHAN (JALALI / SOLAR HIJRI) DATE CONVERTER
+// 1b. AFGHAN (SOLAR HIJRI) DATE CONVERTER
 // ======================================
 
-function gregorianToJalali($gy, $gm, $gd) {
-    $g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
-
-    if ($gy > 1600) {
-        $jy = 979;
-        $gy -= 1600;
-    } else {
-        $jy = 0;
-        $gy -= 621;
-    }
-
+function gregorianToAfghan($gy, $gm, $gd) {
+    $g_d_m = [0,31,59,90,120,151,181,212,243,273,304,334];
     $gy2 = ($gm > 2) ? ($gy + 1) : $gy;
-    $days = (365 * $gy) + ((int)(($gy2 + 3) / 4)) - ((int)(($gy2 + 99) / 100))
-          + ((int)(($gy2 + 399) / 400)) - 80 + $gd + $g_d_m[$gm - 1];
-
-    $jy += 33 * ((int)($days / 12053));
+    $days = 355666 + (365 * $gy) + ((int)(($gy2 + 3) / 4)) - ((int)(($gy2 + 99) / 100)) + ((int)(($gy2 + 399) / 400)) + $gd + $g_d_m[$gm - 1];
+    $jy = -1595 + (33 * ((int)($days / 12053)));
     $days %= 12053;
-
     $jy += 4 * ((int)($days / 1461));
     $days %= 1461;
-
     if ($days > 365) {
         $jy += (int)(($days - 1) / 365);
         $days = ($days - 1) % 365;
     }
-
     if ($days < 186) {
         $jm = 1 + (int)($days / 31);
         $jd = 1 + ($days % 31);
@@ -56,48 +42,35 @@ function gregorianToJalali($gy, $gm, $gd) {
         $jm = 7 + (int)(($days - 186) / 30);
         $jd = 1 + (($days - 186) % 30);
     }
-
     return [$jy, $jm, $jd];
 }
 
-function jalaliToGregorian($jy, $jm, $jd) {
-    if ($jy > 979) {
-        $gy = 1600;
-        $jy -= 979;
-    } else {
-        $gy = 621;
-    }
-
-    $days = (365 * $jy) + (((int)($jy / 33)) * 8) + ((int)((($jy % 33) + 3) / 4))
-          + 78 + $jd + (($jm < 7) ? ($jm - 1) * 31 : (($jm - 7) * 30) + 186);
-
-    $gy += 400 * ((int)($days / 146097));
+function afghanToGregorian($jy, $jm, $jd) {
+    $jy += 1595;
+    $days = -355668 + (365 * $jy) + (((int)($jy / 33)) * 8) + ((int)((($jy % 33) + 3) / 4)) + $jd + (($jm < 7) ? ($jm - 1) * 31 : (($jm - 7) * 30) + 186);
+    $gy = 400 * ((int)($days / 146097));
     $days %= 146097;
-
     if ($days > 36524) {
         $gy += 100 * ((int)(--$days / 36524));
         $days %= 36524;
         if ($days >= 365) $days++;
     }
-
     $gy += 4 * ((int)($days / 1461));
     $days %= 1461;
-
     if ($days > 365) {
         $gy += (int)(($days - 1) / 365);
         $days = ($days - 1) % 365;
     }
-
     $gd = $days + 1;
-
-    $sal_a = [0, 31, ($gy % 4 == 0 && $gy % 100 != 0) || ($gy % 400 == 0) ? 29 : 28,
-              31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-
-    for ($gm = 1; $gm <= 12 && $gd > $sal_a[$gm]; $gm++) {
+    $sal_a = [0,31,($gy % 4 == 0 && $gy % 100 != 0) || ($gy % 400 == 0) ? 29 : 28,31,30,31,30,31,31,30,31,30,31];
+    for ($gm = 0; $gm < 13 && $gd > $sal_a[$gm]; $gm++) {
         $gd -= $sal_a[$gm];
     }
-
     return [$gy, $gm, $gd];
+}
+
+function formatAfghanDate($gy, $gm, $gd) {
+    return sprintf('%04d/%02d/%02d', $gy, $gm, $gd);
 }
 
 function faDate($gregorian, $withMonthName = false) {
@@ -110,7 +83,7 @@ function faDate($gregorian, $withMonthName = false) {
     $gm = (int)date('n', $ts);
     $gd = (int)date('j', $ts);
 
-    [$jy, $jm, $jd] = gregorianToJalali($gy, $gm, $gd);
+    [$jy, $jm, $jd] = gregorianToAfghan($gy, $gm, $gd);
 
     if ($withMonthName) {
         $months = [
@@ -126,6 +99,57 @@ function faDate($gregorian, $withMonthName = false) {
 
 function faToday($withMonthName = false) {
     return faDate(date('Y-m-d'), $withMonthName);
+}
+
+
+// ======================================
+// 1c. AJAX: DATE CONVERTER
+// ======================================
+if (isset($_GET['ajax_date_convert'])) {
+    header('Content-Type: application/json');
+
+    $type = $_GET['type'] ?? '';
+
+    if ($type === 'to_afghan') {
+        $gy = intval($_GET['gy'] ?? 0);
+        $gm = intval($_GET['gm'] ?? 0);
+        $gd = intval($_GET['gd'] ?? 0);
+
+        if ($gy <= 0 || $gm <= 0 || $gm > 12 || $gd <= 0 || $gd > 31) {
+            echo json_encode(['success' => false, 'message' => 'Invalid Gregorian date']);
+            exit();
+        }
+
+        [$jy, $jm, $jd] = gregorianToAfghan($gy, $gm, $gd);
+        echo json_encode([
+            'success' => true,
+            'afghan'  => formatAfghanDate($jy, $jm, $jd),
+            'jy' => $jy, 'jm' => $jm, 'jd' => $jd
+        ]);
+        exit();
+    }
+
+    if ($type === 'to_gregorian') {
+        $jy = intval($_GET['jy'] ?? 0);
+        $jm = intval($_GET['jm'] ?? 0);
+        $jd = intval($_GET['jd'] ?? 0);
+
+        if ($jy <= 0 || $jm <= 0 || $jm > 12 || $jd <= 0 || $jd > 31) {
+            echo json_encode(['success' => false, 'message' => 'Invalid Afghan date']);
+            exit();
+        }
+
+        [$gy, $gm, $gd] = afghanToGregorian($jy, $jm, $jd);
+        echo json_encode([
+            'success' => true,
+            'gregorian' => sprintf('%04d-%02d-%02d', $gy, $gm, $gd),
+            'gy' => $gy, 'gm' => $gm, 'gd' => $gd
+        ]);
+        exit();
+    }
+
+    echo json_encode(['success' => false, 'message' => 'Invalid type']);
+    exit();
 }
 
 
@@ -346,6 +370,10 @@ $history = $conn->query(
      ORDER BY transaction_date DESC, id DESC"
 );
 
+// Today's Afghan date for JS init
+$today_date = date('Y-m-d');
+[$today_jy, $today_jm, $today_jd] = gregorianToAfghan((int)date('Y'), (int)date('n'), (int)date('j'));
+
 
 function h($value) {
     return htmlspecialchars((string)$value, ENT_QUOTES, "UTF-8");
@@ -521,13 +549,10 @@ function h($value) {
             font-size: 0.78rem;
             margin-top: 6px;
         }
-        /* RECEIVED = RED (saraf gave me money) */
         .stat-card.received { --card-accent: #dc2626; }
         .stat-card.received .stat-value { color: #dc2626; }
-        /* PAID = GREEN (I gave money to saraf) */
         .stat-card.paid { --card-accent: #16a34a; }
         .stat-card.paid .stat-value { color: #16a34a; }
-        /* BALANCE = AMBER */
         .stat-card.balance { --card-accent: #f59e0b; }
 
         /* ===== SECTION GRID / CARDS ===== */
@@ -557,10 +582,8 @@ function h($value) {
             height: 4px;
             background: var(--accent-color);
         }
-        /* RECEIVED form card = RED */
         .section-card.green::before { background: #dc2626; }
         .section-card.green .section-header .title i { color: #dc2626; }
-        /* PAID form card = GREEN */
         .section-card.red::before { background: #16a34a; }
         .section-card.red .section-header .title i { color: #16a34a; }
         .section-card.blue::before { background: #3b82f6; }
@@ -634,36 +657,115 @@ function h($value) {
         }
         textarea { min-height: 65px; resize: vertical; }
 
-        /* ===== DUAL DATE INPUT ===== */
-        .dual-date {
+        /* ===== DATE CONVERTER (from payments.php) ===== */
+        .date-converter {
+            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+            border: 2px solid #7dd3fc;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 18px;
+        }
+        .date-converter .converter-title {
+            font-weight: 700;
+            color: #0369a1;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .date-converter .converter-title i { color: #0ea5e9; }
+        .date-converter .converter-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: #0ea5e9;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            margin-right: 6px;
+        }
+        .date-converter-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 12px;
+            align-items: end;
         }
-        @media (max-width: 500px) {
-            .dual-date { grid-template-columns: 1fr; }
+        @media (max-width: 480px) {
+            .date-converter-row { grid-template-columns: 1fr; }
         }
-        .dual-date .date-field { position: relative; }
-        .dual-date .date-field .date-flag {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 0.7rem;
+        .date-field { min-width: 0; }
+        .date-field label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.78rem;
             font-weight: 700;
-            color: var(--text-muted);
-            background: #f1f5f9;
-            padding: 2px 8px;
-            border-radius: 8px;
-            margin-bottom: 4px;
+            color: #0369a1;
         }
-        .dual-date .date-field.us .date-flag { color: #16a34a; background: #dcfce7; }
-        .dual-date .date-field.af .date-flag { color: #d97706; background: #fef3c7; }
-        .dual-date .date-field input { font-size: 0.9rem; }
-        .dual-date .date-field.af input {
+        .date-field label i { color: #0ea5e9; margin-left: 4px; }
+        .date-field input[type="date"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #bae6fd;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            background: #ffffff;
+            color: #0c4a6e;
+            transition: var(--transition);
             direction: ltr;
             text-align: left;
-            letter-spacing: 0.5px;
+            min-height: 44px;
         }
+        .date-field input[type="date"]:focus {
+            outline: none;
+            border-color: #0ea5e9;
+            box-shadow: 0 0 0 4px rgba(14,165,233,0.15);
+        }
+        .date-field .afghan-date-input {
+            display: grid;
+            grid-template-columns: 1fr 1.4fr 1fr;
+            gap: 6px;
+            width: 100%;
+        }
+        .date-field .afghan-date-input select {
+            width: 100%;
+            min-width: 0;
+            padding: 10px 4px;
+            border: 2px solid #bae6fd;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-family: inherit;
+            background: #ffffff;
+            color: #0c4a6e;
+            transition: var(--transition);
+            text-align: center;
+            min-height: 44px;
+            -webkit-appearance: auto !important;
+            appearance: auto !important;
+            background-image: none !important;
+            cursor: pointer;
+            box-sizing: border-box;
+            text-overflow: ellipsis;
+        }
+        .date-field .afghan-date-input select:focus {
+            outline: none;
+            border-color: #0ea5e9;
+            box-shadow: 0 0 0 4px rgba(14,165,233,0.15);
+        }
+        .date-sync-hint {
+            font-size: 0.7rem;
+            color: #0369a1;
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 600;
+        }
+        .date-sync-hint i { color: #0ea5e9; font-size: 0.75rem; }
 
         .preview {
             background: #f1f5f9;
@@ -702,10 +804,8 @@ function h($value) {
             margin-top: 6px;
         }
         .btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
-        /* Received button = RED */
         .btn-green { background: #dc2626; }
         .btn-green:hover { background: #b91c1c; }
-        /* Paid button = GREEN */
         .btn-red { background: #16a34a; }
         .btn-red:hover { background: #15803d; }
         .btn-blue { background: var(--primary-color); }
@@ -780,11 +880,8 @@ function h($value) {
         .amount-usd { color: #16a34a; font-weight: 700; white-space: nowrap; }
         .amount-afn { color: #dc2626; font-weight: 700; white-space: nowrap; }
         .amount-unpaid { color: #d97706; font-weight: 800; white-space: nowrap; }
-
-        /* Table type colors (FLIPPED) */
-        .type-received { color: #dc2626; font-weight: 700; }  /* Received = RED */
-        .type-paid { color: #16a34a; font-weight: 700; }      /* Paid = GREEN */
-
+        .type-received { color: #dc2626; font-weight: 700; }
+        .type-paid { color: #16a34a; font-weight: 700; }
         .date-us { color: #16a34a; font-weight: 600; white-space: nowrap; }
         .date-af { color: #d97706; font-weight: 600; white-space: nowrap; }
 
@@ -819,35 +916,14 @@ function h($value) {
             margin-bottom: 10px;
         }
 
-        /* ===== MOBILE TABLE → STACKED CARDS (FIXED) ===== */
+        /* ===== MOBILE TABLE → STACKED CARDS ===== */
         @media (max-width: 800px) {
-
-            .table-wrapper {
-                border: none;
-                overflow: visible;
-                border-radius: 0;
-            }
-
-            .table-wrapper table {
-                display: block;
-                width: 100%;
-                min-width: 0;
-                border-collapse: separate;
-                border-spacing: 0;
-            }
-
-            .table-wrapper thead {
-                display: none;
-            }
-
-            .table-wrapper tbody {
-                display: block;
-                width: 100%;
-            }
-
+            .table-wrapper { border: none; overflow: visible; border-radius: 0; }
+            .table-wrapper table { display: block; width: 100%; min-width: 0; border-collapse: separate; border-spacing: 0; }
+            .table-wrapper thead { display: none; }
+            .table-wrapper tbody { display: block; width: 100%; }
             .table-wrapper tbody tr {
-                display: block;
-                width: 100%;
+                display: block; width: 100%;
                 background: #ffffff;
                 border: 1px solid #e2e8f0;
                 border-right: 4px solid var(--primary-color);
@@ -857,98 +933,43 @@ function h($value) {
                 box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
                 box-sizing: border-box;
             }
-
-            .table-wrapper tbody tr:hover {
-                background: #ffffff;
-            }
-
+            .table-wrapper tbody tr:hover { background: #ffffff; }
             .table-wrapper tbody td {
-                display: flex;
-                flex-wrap: wrap;
-                justify-content: space-between;
-                align-items: flex-start;
-                gap: 8px 14px;
-                width: 100%;
-                box-sizing: border-box;
-                padding: 10px 0;
-                text-align: right;
+                display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start;
+                gap: 8px 14px; width: 100%; box-sizing: border-box;
+                padding: 10px 0; text-align: right;
                 border-bottom: 1px dashed #e2e8f0;
                 white-space: normal !important;
-                word-break: break-word;
-                overflow-wrap: anywhere;
-                font-size: 0.88rem;
-                line-height: 1.5;
+                word-break: break-word; overflow-wrap: anywhere;
+                font-size: 0.88rem; line-height: 1.5;
             }
-
-            .table-wrapper tbody td:last-child {
-                border-bottom: none;
-            }
-
+            .table-wrapper tbody td:last-child { border-bottom: none; }
             .table-wrapper tbody td::before {
                 content: attr(data-label);
                 display: inline-block;
-                font-weight: 700;
-                color: var(--text-muted);
-                font-size: 0.76rem;
-                flex: 0 0 auto;
-                min-width: 0;
-                text-align: right;
-                white-space: nowrap;
+                font-weight: 700; color: var(--text-muted);
+                font-size: 0.76rem; flex: 0 0 auto;
+                min-width: 0; text-align: right; white-space: nowrap;
             }
-
-            .table-wrapper tbody td > * {
-                max-width: 100%;
-            }
-
-            /* Notes column full width */
+            .table-wrapper tbody td > * { max-width: 100%; }
             .table-wrapper tbody td.note-cell {
-                display: block;
-                min-width: 0;
-                max-width: 100%;
-                white-space: normal;
-                line-height: 1.55;
-                padding: 10px 0;
+                display: block; min-width: 0; max-width: 100%;
+                white-space: normal; line-height: 1.55; padding: 10px 0;
             }
-
             .table-wrapper tbody td.note-cell::before {
-                display: block;
-                margin-bottom: 4px;
-                white-space: normal;
+                display: block; margin-bottom: 4px; white-space: normal;
             }
-
-            /* Actions stack vertically, full-width buttons */
             .table-wrapper tbody td .actions {
-                display: flex;
-                flex-direction: column;
-                gap: 6px;
-                width: 100%;
-                justify-content: flex-start;
-                align-items: stretch;
+                display: flex; flex-direction: column; gap: 6px; width: 100%;
+                justify-content: flex-start; align-items: stretch;
             }
-
             .table-wrapper tbody td .actions a,
             .table-wrapper tbody td .actions button {
-                width: 100%;
-                justify-content: center;
-                padding: 9px 12px;
-                font-size: 0.82rem;
+                width: 100%; justify-content: center; padding: 9px 12px; font-size: 0.82rem;
             }
-
-            .table-wrapper tbody td .actions form {
-                width: 100%;
-                margin: 0;
-            }
-
-            /* Empty-state row */
-            .table-wrapper tbody tr td[colspan] {
-                display: block;
-                padding: 0;
-                border: none;
-            }
-
-            .table-wrapper tbody tr td[colspan]::before {
-                display: none;
-            }
+            .table-wrapper tbody td .actions form { width: 100%; margin: 0; }
+            .table-wrapper tbody tr td[colspan] { display: block; padding: 0; border: none; }
+            .table-wrapper tbody tr td[colspan]::before { display: none; }
         }
 
         @media (max-width: 600px) {
@@ -1001,7 +1022,6 @@ function h($value) {
     <!-- ===== BALANCE SUMMARY ===== -->
     <div class="stats-grid">
 
-        <!-- RECEIVED (from saraf) = RED -->
         <div class="stat-card received">
             <div class="stat-top">
                 <div class="stat-icon"><i class="fas fa-arrow-down"></i></div>
@@ -1014,7 +1034,6 @@ function h($value) {
             </div>
         </div>
 
-        <!-- PAID (to saraf) = GREEN -->
         <div class="stat-card paid">
             <div class="stat-top">
                 <div class="stat-icon"><i class="fas fa-arrow-up"></i></div>
@@ -1073,24 +1092,37 @@ function h($value) {
 
                     <div class="form-group">
                         <label><i class="fas fa-calendar-alt"></i> نېټه</label>
-                        <div class="dual-date">
-                            <div class="date-field us">
-                                <span class="date-flag"><i class="fas fa-flag-usa"></i> میلادي (US)</span>
-                                <input type="date"
-                                       name="transaction_date"
-                                       id="edit_date_us"
-                                       value="<?= h($editData["transaction_date"]) ?>"
-                                       oninput="onEditDateUS()" required>
+
+                        <!-- ===== DATE CONVERTER (EDIT FORM) ===== -->
+                        <div class="date-converter" data-form="edit">
+                            <div class="converter-title">
+                                <i class="fas fa-calendar-alt"></i>
+                                نیټه (دواړه تقویمونه)
+                                <span class="converter-badge"><i class="fas fa-sync-alt"></i> اتومات تړاو</span>
                             </div>
-                            <div class="date-field af">
-                                <span class="date-flag"><i class="fas fa-moon"></i> هجري شمسي (AF)</span>
-                                <input type="text"
-                                       id="edit_date_af"
-                                       placeholder="1405/08/24"
-                                       value="<?= h(faDate($editData["transaction_date"], false)) ?>"
-                                       oninput="onEditDateAF()">
+                            <div class="date-converter-row">
+                                <div class="date-field">
+                                    <label><i class="fas fa-globe"></i> میلادی (US)</label>
+                                    <input type="date"
+                                           id="edit_gregorianDateInput"
+                                           value="<?= h($editData["transaction_date"]) ?>">
+                                </div>
+                                <div class="date-field">
+                                    <label><i class="fas fa-moon"></i> هجري شمسي (افغاني)</label>
+                                    <div class="afghan-date-input">
+                                        <select id="edit_afghanYearSelect"></select>
+                                        <select id="edit_afghanMonthSelect"></select>
+                                        <select id="edit_afghanDaySelect"></select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="date-sync-hint">
+                                <i class="fas fa-info-circle"></i>
+                                یو تقویم بدل کړئ، بل به اتومات ډک شي
                             </div>
                         </div>
+
+                        <input type="hidden" name="transaction_date" id="edit_dateHidden" value="<?= h($editData["transaction_date"]) ?>">
                     </div>
 
                     <div class="form-group">
@@ -1152,24 +1184,37 @@ function h($value) {
 
                 <div class="form-group">
                     <label><i class="fas fa-calendar-alt"></i> نېټه</label>
-                    <div class="dual-date">
-                        <div class="date-field us">
-                            <span class="date-flag"><i class="fas fa-flag-usa"></i> میلادي (US)</span>
-                            <input type="date"
-                                   name="transaction_date"
-                                   id="receive_date_us"
-                                   value="<?= date('Y-m-d') ?>"
-                                   oninput="onReceiveDateUS()" required>
+
+                    <!-- ===== DATE CONVERTER (RECEIVED FORM) ===== -->
+                    <div class="date-converter" data-form="receive">
+                        <div class="converter-title">
+                            <i class="fas fa-calendar-alt"></i>
+                            نیټه (دواړه تقویمونه)
+                            <span class="converter-badge"><i class="fas fa-sync-alt"></i> اتومات تړاو</span>
                         </div>
-                        <div class="date-field af">
-                            <span class="date-flag"><i class="fas fa-moon"></i> هجري شمسي (AF)</span>
-                            <input type="text"
-                                   id="receive_date_af"
-                                   placeholder="1405/08/24"
-                                   value="<?= h(faToday(false)) ?>"
-                                   oninput="onReceiveDateAF()">
+                        <div class="date-converter-row">
+                            <div class="date-field">
+                                <label><i class="fas fa-globe"></i> میلادی (US)</label>
+                                <input type="date"
+                                       id="receive_gregorianDateInput"
+                                       value="<?= $today_date ?>">
+                            </div>
+                            <div class="date-field">
+                                <label><i class="fas fa-moon"></i> هجري شمسي (افغاني)</label>
+                                <div class="afghan-date-input">
+                                    <select id="receive_afghanYearSelect"></select>
+                                    <select id="receive_afghanMonthSelect"></select>
+                                    <select id="receive_afghanDaySelect"></select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="date-sync-hint">
+                            <i class="fas fa-info-circle"></i>
+                            یو تقویم بدل کړئ، بل به اتومات ډک شي
                         </div>
                     </div>
+
+                    <input type="hidden" name="transaction_date" id="receive_dateHidden" value="<?= $today_date ?>">
                 </div>
 
                 <div class="form-group">
@@ -1218,24 +1263,37 @@ function h($value) {
 
                 <div class="form-group">
                     <label><i class="fas fa-calendar-alt"></i> نېټه</label>
-                    <div class="dual-date">
-                        <div class="date-field us">
-                            <span class="date-flag"><i class="fas fa-flag-usa"></i> میلادي (US)</span>
-                            <input type="date"
-                                   name="transaction_date"
-                                   id="paid_date_us"
-                                   value="<?= date('Y-m-d') ?>"
-                                   oninput="onPaidDateUS()" required>
+
+                    <!-- ===== DATE CONVERTER (PAID FORM) ===== -->
+                    <div class="date-converter" data-form="paid">
+                        <div class="converter-title">
+                            <i class="fas fa-calendar-alt"></i>
+                            نیټه (دواړه تقویمونه)
+                            <span class="converter-badge"><i class="fas fa-sync-alt"></i> اتومات تړاو</span>
                         </div>
-                        <div class="date-field af">
-                            <span class="date-flag"><i class="fas fa-moon"></i> هجري شمسي (AF)</span>
-                            <input type="text"
-                                   id="paid_date_af"
-                                   placeholder="1405/08/24"
-                                   value="<?= h(faToday(false)) ?>"
-                                   oninput="onPaidDateAF()">
+                        <div class="date-converter-row">
+                            <div class="date-field">
+                                <label><i class="fas fa-globe"></i> میلادی (US)</label>
+                                <input type="date"
+                                       id="paid_gregorianDateInput"
+                                       value="<?= $today_date ?>">
+                            </div>
+                            <div class="date-field">
+                                <label><i class="fas fa-moon"></i> هجري شمسي (افغاني)</label>
+                                <div class="afghan-date-input">
+                                    <select id="paid_afghanYearSelect"></select>
+                                    <select id="paid_afghanMonthSelect"></select>
+                                    <select id="paid_afghanDaySelect"></select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="date-sync-hint">
+                            <i class="fas fa-info-circle"></i>
+                            یو تقویم بدل کړئ، بل به اتومات ډک شي
                         </div>
                     </div>
+
+                    <input type="hidden" name="transaction_date" id="paid_dateHidden" value="<?= $today_date ?>">
                 </div>
 
                 <div class="form-group">
@@ -1365,141 +1423,150 @@ function h($value) {
 <script>
 
 // ======================================
-// JALALI ↔ GREGORIAN CONVERSION (JS)
+// AFGHAN DATE CONVERTER (from payments.php)
 // ======================================
+const AFGHAN_MONTHS = [
+    'حمل', 'ثور', 'جوزا', 'سرطان', 'اسد', 'سنبله',
+    'میزان', 'عقرب', 'قوس', 'جدی', 'دلو', 'حوت'
+];
 
-function jsGregorianToJalali(gy, gm, gd) {
-    const g_d_m = [0,31,59,90,120,151,181,212,243,273,304,334];
-    let jy, gy2, days, jm, jd;
+const TODAY_JY = <?php echo (int)$today_jy; ?>;
+const TODAY_JM = <?php echo (int)$today_jm; ?>;
+const TODAY_JD = <?php echo (int)$today_jd; ?>;
 
-    if (gy > 1600) { jy = 979; gy -= 1600; }
-    else { jy = 0; gy -= 621; }
-
-    gy2 = (gm > 2) ? (gy + 1) : gy;
-    days = (365 * gy) + Math.floor((gy2 + 3) / 4) - Math.floor((gy2 + 99) / 100)
-         + Math.floor((gy2 + 399) / 400) - 80 + gd + g_d_m[gm - 1];
-
-    jy += 33 * Math.floor(days / 12053);
-    days %= 12053;
-
-    jy += 4 * Math.floor(days / 1461);
-    days %= 1461;
-
-    if (days > 365) {
-        jy += Math.floor((days - 1) / 365);
-        days = (days - 1) % 365;
+function populateYears(selectEl) {
+    selectEl.innerHTML = '';
+    for (let y = TODAY_JY - 30; y <= TODAY_JY + 30; y++) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y;
+        selectEl.appendChild(opt);
     }
+}
 
-    if (days < 186) {
-        jm = 1 + Math.floor(days / 31);
-        jd = 1 + (days % 31);
+function populateMonths(selectEl) {
+    selectEl.innerHTML = '';
+    AFGHAN_MONTHS.forEach((name, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx + 1;
+        opt.textContent = (idx + 1) + ' - ' + name;
+        selectEl.appendChild(opt);
+    });
+}
+
+function populateDays(yearSelect, monthSelect, daySelect, jy, jm, selectedDay) {
+    daySelect.innerHTML = '';
+    let maxDays;
+    if (jm <= 6) maxDays = 31;
+    else if (jm <= 11) maxDays = 30;
+    else {
+        const isLeap = ((jy % 33) % 4 === 1);
+        maxDays = isLeap ? 30 : 29;
+    }
+    for (let d = 1; d <= maxDays; d++) {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = d;
+        daySelect.appendChild(opt);
+    }
+    if (selectedDay && selectedDay <= maxDays) {
+        daySelect.value = selectedDay;
+    }
+}
+
+// ===== WIRE UP ONE DATE CONVERTER =====
+function setupDateConverter(prefix) {
+    const gregInput = document.getElementById(prefix + '_gregorianDateInput');
+    const yearSel   = document.getElementById(prefix + '_afghanYearSelect');
+    const monthSel  = document.getElementById(prefix + '_afghanMonthSelect');
+    const daySel    = document.getElementById(prefix + '_afghanDaySelect');
+    const hidden    = document.getElementById(prefix + '_dateHidden');
+
+    if (!gregInput || !yearSel || !monthSel || !daySel || !hidden) return;
+
+    populateYears(yearSel);
+    populateMonths(monthSel);
+
+    // Initial sync from the existing gregorian value
+    const initGreg = gregInput.value;
+    if (initGreg) {
+        const [gy, gm, gd] = initGreg.split('-').map(Number);
+        fetch('?ajax_date_convert=1&type=to_afghan&gy=' + gy + '&gm=' + gm + '&gd=' + gd)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) return;
+                yearSel.value = data.jy;
+                monthSel.value = data.jm;
+                populateDays(yearSel, monthSel, daySel, data.jy, data.jm, data.jd);
+                daySel.value = data.jd;
+                hidden.value = initGreg;
+            })
+            .catch(err => console.error('Init convert error:', err));
     } else {
-        jm = 7 + Math.floor((days - 186) / 30);
-        jd = 1 + ((days - 186) % 30);
+        yearSel.value = TODAY_JY;
+        monthSel.value = TODAY_JM;
+        populateDays(yearSel, monthSel, daySel, TODAY_JY, TODAY_JM, TODAY_JD);
+        daySel.value = TODAY_JD;
     }
 
-    return [jy, jm, jd];
-}
+    // US → AF
+    gregInput.addEventListener('change', function() {
+        const val = this.value;
+        if (!val) return;
+        const [gy, gm, gd] = val.split('-').map(Number);
+        fetch('?ajax_date_convert=1&type=to_afghan&gy=' + gy + '&gm=' + gm + '&gd=' + gd)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) return;
+                yearSel.value = data.jy;
+                monthSel.value = data.jm;
+                populateDays(yearSel, monthSel, daySel, data.jy, data.jm, data.jd);
+                daySel.value = data.jd;
+                hidden.value = val;
+            })
+            .catch(err => console.error('Convert error:', err));
+    });
 
-function jsJalaliToGregorian(jy, jm, jd) {
-    let gy;
-    if (jy > 979) { gy = 1600; jy -= 979; }
-    else { gy = 621; }
-
-    let days = (365 * jy) + (Math.floor(jy / 33) * 8)
-             + Math.floor(((jy % 33) + 3) / 4)
-             + 78 + jd + ((jm < 7) ? (jm - 1) * 31 : ((jm - 7) * 30) + 186);
-
-    gy += 400 * Math.floor(days / 146097);
-    days %= 146097;
-
-    if (days > 36524) {
-        gy += 100 * Math.floor(--days / 36524);
-        days %= 36524;
-        if (days >= 365) days++;
+    // AF → US
+    function syncToGregorian() {
+        const jy = parseInt(yearSel.value);
+        const jm = parseInt(monthSel.value);
+        const jd = parseInt(daySel.value);
+        if (!jy || !jm || !jd) return;
+        fetch('?ajax_date_convert=1&type=to_gregorian&jy=' + jy + '&jm=' + jm + '&jd=' + jd)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) return;
+                gregInput.value = data.gregorian;
+                hidden.value = data.gregorian;
+            })
+            .catch(err => console.error('Convert error:', err));
     }
 
-    gy += 4 * Math.floor(days / 1461);
-    days %= 1461;
+    yearSel.addEventListener('change', function() {
+        populateDays(yearSel, monthSel, daySel, parseInt(yearSel.value), parseInt(monthSel.value), parseInt(daySel.value));
+        syncToGregorian();
+    });
+    monthSel.addEventListener('change', function() {
+        populateDays(yearSel, monthSel, daySel, parseInt(yearSel.value), parseInt(monthSel.value), parseInt(daySel.value));
+        syncToGregorian();
+    });
+    daySel.addEventListener('change', syncToGregorian);
+}
 
-    if (days > 365) {
-        gy += Math.floor((days - 1) / 365);
-        days = (days - 1) % 365;
+// ===== INIT ALL 3 CONVERTERS =====
+document.addEventListener('DOMContentLoaded', function() {
+    // Edit form only exists if editData is set
+    if (document.getElementById('edit_gregorianDateInput')) {
+        setupDateConverter('edit');
     }
-
-    let gd = days + 1;
-    const sal_a = [0,31,((gy % 4 === 0 && gy % 100 !== 0) || (gy % 400 === 0)) ? 29 : 28,
-                   31,30,31,30,31,31,30,31,30,31];
-
-    let gm;
-    for (gm = 1; gm <= 12 && gd > sal_a[gm]; gm++) {
-        gd -= sal_a[gm];
+    if (document.getElementById('receive_gregorianDateInput')) {
+        setupDateConverter('receive');
     }
-
-    return [gy, gm, gd];
-}
-
-function pad2(n) { return String(n).padStart(2, '0'); }
-
-function usToAf(usDate) {
-    if (!usDate) return '';
-    const parts = usDate.split('-');
-    if (parts.length !== 3) return '';
-    const gy = parseInt(parts[0], 10);
-    const gm = parseInt(parts[1], 10);
-    const gd = parseInt(parts[2], 10);
-    if (isNaN(gy) || isNaN(gm) || isNaN(gd)) return '';
-    const [jy, jm, jd] = jsGregorianToJalali(gy, gm, gd);
-    return `${jy}/${pad2(jm)}/${pad2(jd)}`;
-}
-
-function afToUs(afDate) {
-    if (!afDate) return '';
-    const parts = afDate.replace(/-/g, '/').split('/');
-    if (parts.length !== 3) return '';
-    const jy = parseInt(parts[0], 10);
-    const jm = parseInt(parts[1], 10);
-    const jd = parseInt(parts[2], 10);
-    if (isNaN(jy) || isNaN(jm) || isNaN(jd)) return '';
-    if (jy < 1200 || jy > 1600) return '';
-    if (jm < 1 || jm > 12) return '';
-    if (jd < 1 || jd > 31) return '';
-    const [gy, gm, gd] = jsJalaliToGregorian(jy, jm, jd);
-    return `${gy}-${pad2(gm)}-${pad2(gd)}`;
-}
-
-// -------- RECEIVED FORM --------
-function onReceiveDateUS() {
-    const us = document.getElementById('receive_date_us').value;
-    document.getElementById('receive_date_af').value = usToAf(us);
-}
-function onReceiveDateAF() {
-    const af = document.getElementById('receive_date_af').value.trim();
-    const us = afToUs(af);
-    if (us) document.getElementById('receive_date_us').value = us;
-}
-
-// -------- PAID FORM --------
-function onPaidDateUS() {
-    const us = document.getElementById('paid_date_us').value;
-    document.getElementById('paid_date_af').value = usToAf(us);
-}
-function onPaidDateAF() {
-    const af = document.getElementById('paid_date_af').value.trim();
-    const us = afToUs(af);
-    if (us) document.getElementById('paid_date_us').value = us;
-}
-
-// -------- EDIT FORM --------
-function onEditDateUS() {
-    const us = document.getElementById('edit_date_us').value;
-    document.getElementById('edit_date_af').value = usToAf(us);
-}
-function onEditDateAF() {
-    const af = document.getElementById('edit_date_af').value.trim();
-    const us = afToUs(af);
-    if (us) document.getElementById('edit_date_us').value = us;
-}
+    if (document.getElementById('paid_gregorianDateInput')) {
+        setupDateConverter('paid');
+    }
+});
 
 
 // ======================================
