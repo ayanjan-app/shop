@@ -104,21 +104,37 @@ $expenseTotal = $expRow['total'] ?? 0;
 $expenseCount = $expRow['cnt'] ?? 0;
 
 // =========================
-// SARAFE TOTALS
+// SARAFE TOTALS (NEW LOGIC — saraf_transactions)
 // =========================
-$sarafeWhere = dateWhere('date', $dateFrom, $dateTo);
-$sarafeSql = "SELECT money_type, COUNT(*) AS cnt, COALESCE(SUM(amount),0) AS total 
-              FROM sarafe " . ($sarafeWhere ? "WHERE $sarafeWhere" : "") . "
-              GROUP BY money_type";
-$sarafeRes = $conn->query($sarafeSql);
-$sarafeTypes = [];
-$sarafeTotal = 0;
-$sarafeCount = 0;
-while ($r = $sarafeRes->fetch_assoc()) {
-    $sarafeTypes[$r['money_type']] = $r['total'];
-    $sarafeTotal += $r['total'];
-    $sarafeCount += $r['cnt'];
-}
+$sarafeWhere = dateWhere('transaction_date', $dateFrom, $dateTo);
+
+// Period-based totals (for stat card / period view)
+$sarafePeriodSql = "SELECT
+        COALESCE(SUM(CASE WHEN transaction_type = 'received_from_saraf' THEN usd_amount ELSE 0 END), 0) AS total_received,
+        COALESCE(SUM(CASE WHEN transaction_type = 'paid_to_saraf'     THEN usd_amount ELSE 0 END), 0) AS total_paid,
+        COUNT(*) AS cnt
+    FROM saraf_transactions " . ($sarafeWhere ? "WHERE $sarafeWhere" : "");
+$sarafePeriodRes = $conn->query($sarafePeriodSql);
+$sarafePeriod = $sarafePeriodRes->fetch_assoc();
+
+$sarafeReceivedPeriod = (float)$sarafePeriod['total_received'];
+$sarafePaidPeriod     = (float)$sarafePeriod['total_paid'];
+$sarafeBalancePeriod  = $sarafeReceivedPeriod - $sarafePaidPeriod;
+$sarafeCount          = (int)$sarafePeriod['cnt'];
+
+// All-time totals (used in breakdown section)
+$sarafeAllSql = "SELECT
+        COALESCE(SUM(CASE WHEN transaction_type = 'received_from_saraf' THEN usd_amount ELSE 0 END), 0) AS total_received,
+        COALESCE(SUM(CASE WHEN transaction_type = 'paid_to_saraf'     THEN usd_amount ELSE 0 END), 0) AS total_paid,
+        COUNT(*) AS cnt
+    FROM saraf_transactions";
+$sarafeAllRes = $conn->query($sarafeAllSql);
+$sarafeAll = $sarafeAllRes->fetch_assoc();
+
+$sarafeReceivedAll = (float)$sarafeAll['total_received'];
+$sarafePaidAll     = (float)$sarafeAll['total_paid'];
+$sarafeBalanceAll  = $sarafeReceivedAll - $sarafePaidAll;
+$sarafeCountAll    = (int)$sarafeAll['cnt'];
 
 // =========================
 // TOP CLIENTS BY UNPAID
@@ -548,30 +564,50 @@ $periodLabel = $periodLabels[$period];
             transition: width 0.5s ease;
         }
 
-        /* ===== SARAFE BREAKDOWN ===== */
-        .sarafe-breakdown {
+        /* ===== SARAFE BALANCE (NEW) ===== */
+        .sarafe-balance-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 14px;
             margin-top: 10px;
         }
-        .sarafe-item {
+        .sarafe-balance-item {
             background: #f8fafc;
-            border-radius: 10px;
-            padding: 12px;
+            border-radius: 12px;
+            padding: 16px 14px;
             text-align: center;
             border: 2px solid #e2e8f0;
+            transition: var(--transition);
         }
-        .sarafe-item .sarafe-type {
+        .sarafe-balance-item:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow);
+        }
+        .sarafe-balance-item .sb-label {
             font-size: 0.8rem;
             color: var(--text-muted);
             font-weight: 700;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
-        .sarafe-item .sarafe-amount {
-            font-size: 1.1rem;
+        .sarafe-balance-item .sb-value {
+            font-size: 1.25rem;
             font-weight: 800;
-            color: var(--primary-color);
+            line-height: 1.2;
+        }
+        .sarafe-balance-item.received { border-color: #86efac; }
+        .sarafe-balance-item.received .sb-value { color: #16a34a; }
+        .sarafe-balance-item.paid { border-color: #fca5a5; }
+        .sarafe-balance-item.paid .sb-value { color: #dc2626; }
+        .sarafe-balance-item.balance { border-color: #fcd34d; background: #fffbeb; }
+        .sarafe-balance-item.balance .sb-value { color: #d97706; }
+        .sarafe-balance-item .sb-meta {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 6px;
         }
 
         /* ===== TABLE ===== */
@@ -753,17 +789,17 @@ $periodLabel = $periodLabels[$period];
             </div>
         </div>
 
-        <!-- Sarafe -->
+        <!-- Sarafe (NEW LOGIC) -->
         <div class="stat-card sarafe">
             <div class="stat-top">
                 <div class="stat-icon"><i class="fas fa-exchange-alt"></i></div>
                 <span class="stat-badge">صرافي</span>
             </div>
-            <div class="stat-label">صرافي پیسې</div>
-            <div class="stat-value"><?php echo number_format($sarafeTotal, 2); ?></div>
+            <div class="stat-label">صرافي بیلانس (ډالر)</div>
+            <div class="stat-value"><?php echo number_format($sarafeBalancePeriod, 2); ?> $</div>
             <div class="stat-sub">
                 <i class="fas fa-list"></i>
-                <?php echo number_format($sarafeCount); ?> ریکارډونه
+                <?php echo number_format($sarafeCount); ?> معاملې
             </div>
         </div>
 
@@ -817,26 +853,35 @@ $periodLabel = $periodLabels[$period];
             <?php endif; ?>
         </div>
 
-        <!-- Sarafe Breakdown -->
+        <!-- Sarafe Balance (NEW LOGIC) -->
         <div class="section-card">
             <div class="section-header">
-                <div class="title"><i class="fas fa-exchange-alt"></i> د صرافي تفصیل</div>
+                <div class="title"><i class="fas fa-exchange-alt"></i> د صرافي بیلانس</div>
                 <a href="sarafe.php" class="view-link">ټول وګوره</a>
             </div>
 
-            <?php if ($sarafeCount > 0): ?>
-                <div class="sarafe-breakdown">
-                    <?php foreach ($sarafeTypes as $type => $amt): ?>
-                        <div class="sarafe-item">
-                            <div class="sarafe-type"><?php echo htmlspecialchars($type); ?></div>
-                            <div class="sarafe-amount"><?php echo number_format($amt, 2); ?></div>
-                        </div>
-                    <?php endforeach; ?>
+            <?php if ($sarafeCountAll > 0): ?>
+                <div class="sarafe-balance-grid">
+                    <div class="sarafe-balance-item received">
+                        <div class="sb-label"><i class="fas fa-arrow-down"></i> ترلاسه شوي</div>
+                        <div class="sb-value">$<?php echo number_format($sarafeReceivedAll, 2); ?></div>
+                        <div class="sb-meta">له صراف څخه</div>
+                    </div>
+                    <div class="sarafe-balance-item paid">
+                        <div class="sb-label"><i class="fas fa-arrow-up"></i> ورکړل شوي</div>
+                        <div class="sb-value">$<?php echo number_format($sarafePaidAll, 2); ?></div>
+                        <div class="sb-meta">صراف ته</div>
+                    </div>
+                    <div class="sarafe-balance-item balance">
+                        <div class="sb-label"><i class="fas fa-wallet"></i> اوسنی بیلانس</div>
+                        <div class="sb-value">$<?php echo number_format($sarafeBalanceAll, 2); ?></div>
+                        <div class="sb-meta">ټول وخت · <?php echo number_format($sarafeCountAll); ?> معاملې</div>
+                    </div>
                 </div>
             <?php else: ?>
                 <div class="mini-empty">
                     <i class="fas fa-inbox"></i>
-                    د دې مودې لپاره هیڅ صرافي ریکارډ نشته.
+                    هیڅ صرافي معامله نشته.
                 </div>
             <?php endif; ?>
         </div>

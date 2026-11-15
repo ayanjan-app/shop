@@ -1,296 +1,307 @@
 <?php
-session_start();
-require_once 'db.php';
+// ======================================
+// 1. DATABASE CONNECTION
+// ======================================
 
-if(!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
-    exit();
+$conn = new mysqli("localhost", "root", "", "shop");
+
+if ($conn->connect_error) {
+    die("Database connection failed: " . $conn->connect_error);
 }
 
-$success_msg = '';
-$error_msg = '';
+$conn->set_charset("utf8mb4");
+date_default_timezone_set("Asia/Kabul");
 
-// Retrieve flash messages from session (PRG pattern)
-if (isset($_SESSION['flash_success'])) {
-    $success_msg = $_SESSION['flash_success'];
-    unset($_SESSION['flash_success']);
-}
-if (isset($_SESSION['flash_error'])) {
-    $error_msg = $_SESSION['flash_error'];
-    unset($_SESSION['flash_error']);
-}
+$message = "";
+$error = "";
 
-// =========================
-// AFGHAN (SOLAR HIJRI) DATE CONVERTER
-// =========================
-function gregorianToAfghan($gy, $gm, $gd) {
-    $g_d_m = [0,31,59,90,120,151,181,212,243,273,304,334];
-    $gy2 = ($gm > 2) ? ($gy + 1) : $gy;
-    $days = 355666 + (365 * $gy) + ((int)(($gy2 + 3) / 4)) - ((int)(($gy2 + 99) / 100)) + ((int)(($gy2 + 399) / 400)) + $gd + $g_d_m[$gm - 1];
-    $jy = -1595 + (33 * ((int)($days / 12053)));
-    $days %= 12053;
-    $jy += 4 * ((int)($days / 1461));
-    $days %= 1461;
-    if ($days > 365) {
-        $jy += (int)(($days - 1) / 365);
-        $days = ($days - 1) % 365;
+
+// ======================================
+// 2. COMMON VALIDATION FUNCTION
+// ======================================
+
+function validTransaction($type, $currency, $date, $amount, $rate) {
+
+    $validType =
+        ($type === "received_from_saraf" &&
+            in_array($currency, ["CNY", "USD"], true)) ||
+
+        ($type === "paid_to_saraf" &&
+            in_array($currency, ["AFN", "USD"], true));
+
+    $validDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) &&
+        checkdate(
+            (int)substr($date, 5, 2),
+            (int)substr($date, 8, 2),
+            (int)substr($date, 0, 4)
+        );
+
+    if ($currency === "USD") {
+        $rate = 1;
     }
-    if ($days < 186) {
-        $jm = 1 + (int)($days / 31);
-        $jd = 1 + ($days % 31);
-    } else {
-        $jm = 7 + (int)(($days - 186) / 30);
-        $jd = 1 + (($days - 186) % 30);
-    }
-    return [$jy, $jm, $jd];
+
+    return $validType &&
+        $validDate &&
+        $amount > 0 &&
+        $rate > 0;
 }
 
-function afghanToGregorian($jy, $jm, $jd) {
-    $jy += 1595;
-    $days = -355668 + (365 * $jy) + (((int)($jy / 33)) * 8) + ((int)((($jy % 33) + 3) / 4)) + $jd + (($jm < 7) ? ($jm - 1) * 31 : (($jm - 7) * 30) + 186);
-    $gy = 400 * ((int)($days / 146097));
-    $days %= 146097;
-    if ($days > 36524) {
-        $gy += 100 * ((int)(--$days / 36524));
-        $days %= 36524;
-        if ($days >= 365) $days++;
-    }
-    $gy += 4 * ((int)($days / 1461));
-    $days %= 1461;
-    if ($days > 365) {
-        $gy += (int)(($days - 1) / 365);
-        $days = ($days - 1) % 365;
-    }
-    $gd = $days + 1;
-    $sal_a = [0,31,($gy % 4 == 0 && $gy % 100 != 0) || ($gy % 400 == 0) ? 29 : 28,31,30,31,30,31,31,30,31,30,31];
-    for ($gm = 0; $gm < 13 && $gd > $sal_a[$gm]; $gm++) {
-        $gd -= $sal_a[$gm];
-    }
-    return [$gy, $gm, $gd];
-}
 
-function formatAfghanDate($gy, $gm, $gd) {
-    return sprintf('%04d/%02d/%02d', $gy, $gm, $gd);
-}
+// ======================================
+// 3. DELETE TRANSACTION
+// ======================================
 
-function formatAfghanDateFromGregorian($gregorianDate) {
-    if (empty($gregorianDate) || $gregorianDate === '0000-00-00') return '—';
-    $parts = explode('-', $gregorianDate);
-    if (count($parts) < 3) return $gregorianDate;
-    [$gy, $gm, $gd] = [(int)$parts[0], (int)$parts[1], (int)$parts[2]];
-    [$jy, $jm, $jd] = gregorianToAfghan($gy, $gm, $gd);
-    return sprintf('%04d/%02d/%02d', $jy, $jm, $jd);
-}
+if ($_SERVER["REQUEST_METHOD"] === "POST" &&
+    ($_POST["action"] ?? "") === "delete") {
 
-// =========================
-// AJAX: DATE CONVERTER
-// =========================
-if (isset($_GET['ajax_date_convert'])) {
-    header('Content-Type: application/json');
-    
-    $type = $_GET['type'] ?? '';
-    
-    if ($type === 'to_afghan') {
-        $gy = intval($_GET['gy'] ?? 0);
-        $gm = intval($_GET['gm'] ?? 0);
-        $gd = intval($_GET['gd'] ?? 0);
-        
-        if ($gy <= 0 || $gm <= 0 || $gm > 12 || $gd <= 0 || $gd > 31) {
-            echo json_encode(['success' => false, 'message' => 'Invalid Gregorian date']);
-            exit();
+    $id = (int)($_POST["id"] ?? 0);
+
+    if ($id > 0) {
+
+        $stmt = $conn->prepare(
+            "DELETE FROM saraf_transactions WHERE id = ?"
+        );
+
+        $stmt->bind_param("i", $id);
+
+        if ($stmt->execute() && $stmt->affected_rows > 0) {
+            header("Location: sarafe.php?deleted=1");
+            exit;
+        } else {
+            $error = "Transaction not found or could not be deleted.";
         }
-        
-        [$jy, $jm, $jd] = gregorianToAfghan($gy, $gm, $gd);
-        echo json_encode([
-            'success' => true,
-            'afghan' => formatAfghanDate($jy, $jm, $jd),
-            'jy' => $jy, 'jm' => $jm, 'jd' => $jd
-        ]);
-        exit();
-    }
-    
-    if ($type === 'to_gregorian') {
-        $jy = intval($_GET['jy'] ?? 0);
-        $jm = intval($_GET['jm'] ?? 0);
-        $jd = intval($_GET['jd'] ?? 0);
-        
-        if ($jy <= 0 || $jm <= 0 || $jm > 12 || $jd <= 0 || $jd > 31) {
-            echo json_encode(['success' => false, 'message' => 'Invalid Afghan date']);
-            exit();
-        }
-        
-        [$gy, $gm, $gd] = afghanToGregorian($jy, $jm, $jd);
-        echo json_encode([
-            'success' => true,
-            'gregorian' => sprintf('%04d-%02d-%02d', $gy, $gm, $gd),
-            'gy' => $gy, 'gm' => $gm, 'gd' => $gd
-        ]);
-        exit();
-    }
-    
-    echo json_encode(['success' => false, 'message' => 'Invalid type']);
-    exit();
-}
 
-// =========================
-// DELETE SARAFE (GET → redirect)
-// =========================
-if (isset($_GET['delete_id'])) {
-    $delete_id = intval($_GET['delete_id']);
-    $stmt = $conn->prepare("DELETE FROM sarafe WHERE id = ?");
-    $stmt->bind_param("i", $delete_id);
-    if ($stmt->execute()) {
-        $_SESSION['flash_success'] = "ریکارډ په بریالیتوب سره ړنګ شو!";
+        $stmt->close();
+
     } else {
-        $_SESSION['flash_error'] = "تېروتنه: " . $stmt->error;
+        $error = "Invalid transaction ID.";
     }
-    $stmt->close();
-    header("Location: " . strtok($_SERVER["REQUEST_URI"], '?'));
-    exit();
 }
 
-// =========================
-// ADD SARAFE (POST → redirect)
-// =========================
-if (isset($_POST['add_sarafe'])) {
-    $item_name  = trim($_POST['item_name'] ?? '');
-    $amount     = trim($_POST['amount'] ?? '');
-    $date       = trim($_POST['date'] ?? '');
-    $money_type = trim($_POST['money_type'] ?? '');
-    $note       = trim($_POST['note'] ?? '');
-    $hasError   = false;
 
-    // Allowed money types
-    $allowed_types = ['چیني', 'افغاني', 'ډالر'];
+// ======================================
+// 4. SAVE OR UPDATE TRANSACTION
+// ======================================
 
-    if (empty($item_name)) {
-        $_SESSION['flash_error'] = "د توکي نوم اړین دی";
-        $hasError = true;
-    } elseif ($amount === '') {
-        $_SESSION['flash_error'] = "اندازه اړینه ده";
-        $hasError = true;
-    } elseif (empty($date)) {
-        $_SESSION['flash_error'] = "نېټه اړینه ده";
-        $hasError = true;
-    } elseif (empty($money_type)) {
-        $_SESSION['flash_error'] = "د پیسو ډول اړین دی";
-        $hasError = true;
-    } elseif (!in_array($money_type, $allowed_types)) {
-        $_SESSION['flash_error'] = "د پیسو ډول سم نه دی";
-        $hasError = true;
+if ($_SERVER["REQUEST_METHOD"] === "POST" &&
+    in_array($_POST["action"] ?? "", ["save", "update"], true)) {
+
+    $action = $_POST["action"];
+
+    $id = (int)($_POST["id"] ?? 0);
+
+    $type = $_POST["transaction_type"] ?? "";
+    $date = $_POST["transaction_date"] ?? "";
+    $currency = $_POST["currency"] ?? "";
+
+    $amount = (float)($_POST["amount"] ?? 0);
+    $rate = (float)($_POST["exchange_rate"] ?? 0);
+
+    $note = trim($_POST["note"] ?? "");
+
+    if ($currency === "USD") {
+        $rate = 1;
     }
 
-    if (!$hasError) {
-        $stmt = $conn->prepare("INSERT INTO sarafe (name, amount, date, money_type, note) VALUES (?, ?, ?, ?, ?)");
-        $stmt->bind_param("sdsss", $item_name, $amount, $date, $money_type, $note);
+    if (!validTransaction($type, $currency, $date, $amount, $rate)) {
+
+        $error = "Please enter valid transaction information.";
+
+    } elseif ($action === "update" && $id <= 0) {
+
+        $error = "Invalid transaction ID.";
+
+    } else {
+
+        // Calculate USD amount
+        $usdAmount = round($amount / $rate, 2);
+
+        if ($action === "save") {
+
+            $sql = "INSERT INTO saraf_transactions
+                    (transaction_type, transaction_date, currency,
+                     amount, exchange_rate, usd_amount, note)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+            $stmt = $conn->prepare($sql);
+
+            $stmt->bind_param(
+                "sssddds",
+                $type,
+                $date,
+                $currency,
+                $amount,
+                $rate,
+                $usdAmount,
+                $note
+            );
+
+        } else {
+
+            // Update existing transaction
+            $sql = "UPDATE saraf_transactions SET
+                    transaction_type = ?,
+                    transaction_date = ?,
+                    currency = ?,
+                    amount = ?,
+                    exchange_rate = ?,
+                    usd_amount = ?,
+                    note = ?
+                    WHERE id = ?";
+
+            $stmt = $conn->prepare($sql);
+
+            $stmt->bind_param(
+                "sssdddsi",
+                $type,
+                $date,
+                $currency,
+                $amount,
+                $rate,
+                $usdAmount,
+                $note,
+                $id
+            );
+        }
 
         if ($stmt->execute()) {
-            $_SESSION['flash_success'] = "ریکارډ په بریالیتوب سره اضافه شو!";
+
+            if ($action === "save") {
+                header("Location: sarafe.php?success=1");
+            } else {
+                header("Location: sarafe.php?updated=1");
+            }
+
+            exit;
+
         } else {
-            $_SESSION['flash_error'] = "تېروتنه: " . $stmt->error;
+            $error = "Transaction could not be saved.";
         }
+
         $stmt->close();
     }
-
-    header("Location: " . strtok($_SERVER["REQUEST_URI"], '?'));
-    exit();
 }
 
-// =========================
-// FILTER
-// =========================
-$filter = $_GET['filter'] ?? 'all';
-$where = "";
 
-if ($filter == "today") {
-    $where = "WHERE date = CURDATE()";
-} elseif ($filter == "yesterday") {
-    $where = "WHERE date = DATE_SUB(CURDATE(), INTERVAL 1 DAY)";
-} elseif ($filter == "week") {
-    $where = "WHERE YEARWEEK(date, 1) = YEARWEEK(CURDATE(), 1)";
-} elseif ($filter == "month") {
-    $where = "WHERE YEAR(date) = YEAR(CURDATE()) AND MONTH(date) = MONTH(CURDATE())";
-} elseif ($filter == "custom") {
-    $from_date = $_GET['from_date'] ?? '';
-    $to_date = $_GET['to_date'] ?? '';
-    if (!empty($from_date) && !empty($to_date)) {
-        $where = "WHERE date BETWEEN '$from_date' AND '$to_date'";
+// ======================================
+// 5. SUCCESS MESSAGES
+// ======================================
+
+if (isset($_GET["success"])) {
+    $message = "Transaction saved successfully!";
+}
+
+if (isset($_GET["updated"])) {
+    $message = "Transaction updated successfully!";
+}
+
+if (isset($_GET["deleted"])) {
+    $message = "Transaction deleted successfully!";
+}
+
+
+// ======================================
+// 6. GET TRANSACTION FOR EDITING
+// ======================================
+
+$editData = null;
+
+if (isset($_GET["edit"])) {
+
+    $editId = (int)$_GET["edit"];
+
+    if ($editId > 0) {
+
+        $stmt = $conn->prepare(
+            "SELECT * FROM saraf_transactions WHERE id = ?"
+        );
+
+        $stmt->bind_param("i", $editId);
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+        $editData = $result->fetch_assoc();
+
+        $stmt->close();
+
+        if (!$editData) {
+            $error = "Transaction not found.";
+        }
     }
 }
 
-// Search
-$search_name = isset($_GET['search_name']) ? trim($_GET['search_name']) : '';
-$filter_type = isset($_GET['filter_type']) ? trim($_GET['filter_type']) : '';
 
-$extraWhere = [];
-if ($search_name !== '') {
-    $extraWhere[] = "name LIKE '%" . $conn->real_escape_string($search_name) . "%'";
+// ======================================
+// 7. CALCULATE BALANCE
+// ======================================
+
+$sql = "SELECT
+
+    COALESCE(SUM(
+        CASE
+            WHEN transaction_type = 'received_from_saraf'
+            THEN usd_amount ELSE 0
+        END
+    ), 0) AS total_received,
+
+    COALESCE(SUM(
+        CASE
+            WHEN transaction_type = 'paid_to_saraf'
+            THEN usd_amount ELSE 0
+        END
+    ), 0) AS total_paid
+
+    FROM saraf_transactions";
+
+$result = $conn->query($sql);
+
+$summary = $result->fetch_assoc();
+
+$totalReceived = (float)$summary["total_received"];
+$totalPaid = (float)$summary["total_paid"];
+
+$balance = $totalReceived - $totalPaid;
+
+
+// ======================================
+// 8. TRANSACTION HISTORY
+// ======================================
+
+$history = $conn->query(
+    "SELECT * FROM saraf_transactions
+     ORDER BY transaction_date DESC, id DESC"
+);
+
+
+function h($value) {
+    return htmlspecialchars((string)$value, ENT_QUOTES, "UTF-8");
 }
-if ($filter_type !== '') {
-    $extraWhere[] = "money_type = '" . $conn->real_escape_string($filter_type) . "'";
-}
 
-if (!empty($extraWhere)) {
-    if ($where === "") {
-        $where = "WHERE " . implode(" AND ", $extraWhere);
-    } else {
-        $where .= " AND " . implode(" AND ", $extraWhere);
-    }
-}
-
-// =========================
-// GET RECORDS
-// =========================
-$sql = "SELECT * FROM sarafe $where ORDER BY id DESC";
-$result = mysqli_query($conn, $sql);
-$record_count = mysqli_num_rows($result);
-
-// =========================
-// CALCULATE TOTAL
-// =========================
-$total_sql = "SELECT SUM(amount) AS total FROM sarafe $where";
-$total_result = mysqli_query($conn, $total_sql);
-$total_data = mysqli_fetch_assoc($total_result);
-$total = $total_data['total'] ?? 0;
-
-// =========================
-// STATS
-// =========================
-$count_sql = "SELECT COUNT(*) AS cnt FROM sarafe $where";
-$count_result = mysqli_query($conn, $count_sql);
-$count_data = mysqli_fetch_assoc($count_result);
-$stats_count = $count_data['cnt'] ?? 0;
-
-$today_sql = "SELECT SUM(amount) AS today_total FROM sarafe WHERE date = CURDATE()";
-$today_result = mysqli_query($conn, $today_sql);
-$today_data = mysqli_fetch_assoc($today_result);
-$today_total = $today_data['today_total'] ?? 0;
-
-// Today's date for default
-$today_date = date('Y-m-d');
-list($today_jy, $today_jm, $today_jd) = gregorianToAfghan((int)date('Y'), (int)date('n'), (int)date('j'));
-$today_afghan = formatAfghanDate($today_jy, $today_jm, $today_jd);
-
-// Fixed money types for dropdown
-$money_types_list = ['چیني', 'افغاني', 'ډالر'];
 ?>
+
 <!DOCTYPE html>
 <html lang="ps" dir="rtl">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>صرافي · بنجاره پلورنحٔی  </title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>صرافي حساب · د صرافۍ مدیریت</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
         :root {
             --primary-color: #1e3c72;
             --secondary-color: #2b4a7a;
             --accent-color: #e6b12e;
             --success-color: #22c55e;
-            --warning-color: #f59e0b;
             --danger-color: #ef4444;
             --info-color: #3b82f6;
+            --warning-color: #f59e0b;
+            --purple-color: #8b5cf6;
             --text-color: #1f2937;
             --text-muted: #64748b;
             --card-bg: #ffffff;
@@ -302,701 +313,953 @@ $money_types_list = ['چیني', 'افغاني', 'ډالر'];
         }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Noto Naskh Arabic', 'Segoe UI', Tahoma, sans-serif; }
         body { background: var(--bg-light); color: var(--text-color); min-height: 100vh; font-size: 14px; line-height: 1.6; }
-        .main-content { padding: 5px; }
+        .main-content { padding: 5px; max-width: 1800px; margin: 0 auto; }
         @media (max-width: 768px) { .main-content { padding: 5px; padding-top: 5px; } }
 
-        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; padding: 18px 24px; background: var(--primary-color); border-radius: var(--border-radius); color: white; box-shadow: var(--shadow); }
-        .page-header h1 { font-size: 1.6rem; display: flex; align-items: center; gap: 12px; font-weight: 700; margin: 0; }
-        .page-header h1 i { color: var(--accent-color); }
-        .page-header .subtitle { color: rgba(255,255,255,0.8); font-size: 0.85rem; margin-top: 5px; }
-
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 25px; }
-        .stat-card { background: var(--card-bg); border-radius: var(--border-radius); padding: 24px 20px; box-shadow: var(--shadow); transition: var(--transition); border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 18px; }
-        .stat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
-        .stat-icon { width: 60px; height: 60px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: white; flex-shrink: 0; }
-        .stat-icon.total { background: var(--primary-color); }
-        .stat-icon.count { background: var(--accent-color); }
-        .stat-icon.today { background: var(--success-color); }
-        .stat-info h3 { margin: 0; font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
-        .stat-info p { margin: 6px 0 0; font-size: 1.5rem; font-weight: 700; color: var(--primary-color); }
-        .stat-card:nth-child(1) { border-top: 4px solid var(--primary-color); }
-        .stat-card:nth-child(2) { border-top: 4px solid var(--accent-color); }
-        .stat-card:nth-child(3) { border-top: 4px solid var(--success-color); }
-
-        .alert { padding: 14px 20px; border-radius: 12px; margin-bottom: 20px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 12px; }
-        .alert-success { background-color: #dcfce7; color: #166534; border-right: 4px solid var(--success-color); }
-        .alert-danger { background-color: #fee2e2; color: #991b1b; border-right: 4px solid var(--danger-color); }
-
-        .content-grid { display: grid; grid-template-columns: 380px 1fr; gap: 25px; align-items: start; }
-        @media (max-width: 1100px) { .content-grid { grid-template-columns: 1fr; } }
-
-        .card { background: var(--card-bg); border-radius: var(--border-radius); padding: 25px; box-shadow: var(--shadow); position: relative; overflow: hidden; border: 1px solid #e2e8f0; }
-        .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--accent-color); }
-        .card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #f1f5f9; }
-        .card-header i { color: var(--accent-color); font-size: 1.3rem; }
-        .card-header h2 { margin: 0; font-size: 1.2rem; color: var(--primary-color); font-weight: 700; }
-
-        .form-group { margin-bottom: 16px; }
-        .form-group label { display: block; margin-bottom: 6px; font-size: 0.85rem; font-weight: 600; color: var(--primary-color); }
-        .form-group label i { color: var(--accent-color); margin-left: 6px; width: 16px; }
-        .form-group input, .form-group textarea, .form-group select {
-            width: 100%; padding: 12px 14px; border: 2px solid #e2e8f0; border-radius: 10px;
-            font-size: 0.95rem; transition: var(--transition); font-family: inherit;
-            background: var(--card-bg); color: var(--text-color); text-align: right;
-            min-height: 48px;
+        /* ===== WELCOME HEADER ===== */
+        .welcome-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 25px;
+            padding: 22px 28px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2b4a7a 100%);
+            border-radius: var(--border-radius);
+            color: white;
+            box-shadow: var(--shadow);
         }
-        /* ✅ Fix: responsive select dropdown */
-        .form-group select,
-        .search-row select,
-        .custom-filter select {
-            -webkit-appearance: none !important;
-            -moz-appearance: none !important;
-            appearance: none !important;
-            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%231e3c72' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>") !important;
-            background-repeat: no-repeat !important;
-            background-position: left 12px center !important;
-            background-size: 16px !important;
-            background-color: #ffffff !important;
-            padding: 12px 14px 12px 44px !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            min-width: 0 !important;
-            box-sizing: border-box !important;
-            cursor: pointer;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            overflow: hidden;
-            line-height: 1.4;
-            display: block;
-            direction: rtl;
-            font-family: 'Noto Naskh Arabic', 'Segoe UI', Tahoma, sans-serif !important;
-        }
-
-        .form-group textarea { resize: vertical; min-height: 70px; }
-        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
-            outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(30,60,114,0.1);
-        }
-        .form-group input[type="date"] { direction: ltr; text-align: right; }
-
-        /* ===== DATE CONVERTER ===== */
-        .date-converter {
-            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
-            border: 2px solid #7dd3fc;
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 16px;
-        }
-        .date-converter .converter-title {
+        .welcome-header .welcome-text h1 {
+            font-size: 1.6rem;
             font-weight: 700;
-            color: #0369a1;
+            margin: 0 0 5px;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .welcome-header .welcome-text h1 i { color: var(--accent-color); }
+        .welcome-header .welcome-text p {
+            color: rgba(255,255,255,0.85);
             font-size: 0.9rem;
-            margin-bottom: 12px;
+            margin: 0;
+        }
+        .welcome-header .welcome-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .welcome-header .welcome-info .user-chip,
+        .welcome-header .welcome-info .date-chip {
+            background: rgba(255,255,255,0.15);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
             display: flex;
             align-items: center;
             gap: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
         }
-        .date-converter .converter-title i { color: #0ea5e9; }
-        .date-converter-row {
+        .welcome-header .welcome-info .user-chip i { color: var(--accent-color); }
+        .welcome-header .welcome-info .date-chip i { color: var(--accent-color); }
+
+        /* ===== ALERTS ===== */
+        .alert {
+            padding: 14px 20px;
+            margin-bottom: 20px;
+            border-radius: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .alert.success {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #86efac;
+        }
+        .alert.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        /* ===== STATS GRID ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        .stat-card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 22px 20px;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+            border: 1px solid #e2e8f0;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-hover);
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            background: var(--card-accent, var(--accent-color));
+        }
+        .stat-card .stat-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+        .stat-card .stat-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.35rem;
+            color: white;
+            background: var(--card-accent, var(--accent-color));
+            flex-shrink: 0;
+        }
+        .stat-card .stat-badge {
+            background: #f1f5f9;
+            color: var(--text-muted);
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        .stat-card .stat-label {
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        .stat-card .stat-value {
+            font-size: 1.55rem;
+            font-weight: 800;
+            color: var(--primary-color);
+            line-height: 1.2;
+        }
+        .stat-card .stat-sub {
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            margin-top: 6px;
+        }
+        .stat-card.received { --card-accent: #16a34a; }
+        .stat-card.paid { --card-accent: #dc2626; }
+        .stat-card.balance { --card-accent: #f59e0b; }
+
+        /* ===== SECTION GRID / CARDS ===== */
+        .section-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            align-items: end;
+            gap: 25px;
+            margin-bottom: 25px;
         }
-        @media (max-width: 480px) {
-            .date-converter-row { grid-template-columns: 1fr; }
+        @media (max-width: 1000px) {
+            .section-grid { grid-template-columns: 1fr; }
         }
-        .date-field label {
-            display: block;
-            margin-bottom: 5px;
-            font-size: 0.78rem;
+        .section-card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 22px 24px;
+            box-shadow: var(--shadow);
+            border: 1px solid #e2e8f0;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 25px;
+        }
+        .section-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            background: var(--accent-color);
+        }
+        .section-card.green::before { background: #16a34a; }
+        .section-card.red::before { background: #dc2626; }
+        .section-card.blue::before { background: #3b82f6; }
+
+        .section-card .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 14px;
+            margin-bottom: 16px;
+            border-bottom: 2px solid #f1f5f9;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .section-card .section-header .title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.1rem;
             font-weight: 700;
-            color: #0369a1;
+            color: var(--primary-color);
         }
-        .date-field label i { color: #0ea5e9; margin-left: 4px; }
-        .date-field input[type="date"] {
+        .section-card .section-header .title i {
+            color: var(--accent-color);
+            font-size: 1.15rem;
+        }
+        .section-card.green .section-header .title i { color: #16a34a; }
+        .section-card.red .section-header .title i { color: #dc2626; }
+        .section-card.blue .section-header .title i { color: #3b82f6; }
+
+        .section-card .section-header .view-link {
+            color: var(--primary-color);
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-decoration: none;
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: #f1f5f9;
+            transition: var(--transition);
+        }
+        .section-card .section-header .view-link:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        /* ===== FORM ELEMENTS ===== */
+        .form-group { margin-bottom: 14px; }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 700;
+            color: var(--text-color);
+            font-size: 0.88rem;
+        }
+        .form-group label i {
+            color: var(--accent-color);
+            margin-left: 5px;
+        }
+        input, select, textarea {
             width: 100%;
-            padding: 10px 12px;
-            border: 2px solid #bae6fd;
+            padding: 11px 14px;
+            border: 1px solid #cbd5e1;
             border-radius: 10px;
             font-size: 0.9rem;
             font-family: inherit;
-            background: #ffffff;
-            color: #0c4a6e;
             transition: var(--transition);
-            direction: ltr;
-            text-align: left;
-            min-height: 44px;
+            background: #fff;
         }
-        .date-field input[type="date"]:focus {
+        input:focus, select:focus, textarea:focus {
             outline: none;
-            border-color: #0ea5e9;
-            box-shadow: 0 0 0 4px rgba(14,165,233,0.15);
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(30,60,114,0.12);
         }
-        .date-field .afghan-date-input {
-            display: flex;
-            gap: 4px;
+        textarea {
+            min-height: 65px;
+            resize: vertical;
         }
-        .date-field .afghan-date-input select {
-            flex: 1;
-            padding: 10px 6px;
-            border: 2px solid #bae6fd;
+        .preview {
+            background: #f1f5f9;
+            padding: 13px 16px;
+            margin: 15px 0;
             border-radius: 10px;
-            font-size: 0.85rem;
-            font-family: inherit;
-            background: #ffffff;
-            color: #0c4a6e;
-            transition: var(--transition);
-            text-align: center;
-            min-height: 44px;
-            -webkit-appearance: auto !important;
-            appearance: auto !important;
-            background-image: none !important;
-            padding-right: 6px !important;
-            cursor: pointer;
-        }
-        .date-field .afghan-date-input select:focus {
-            outline: none;
-            border-color: #0ea5e9;
-            box-shadow: 0 0 0 4px rgba(14,165,233,0.15);
-        }
-        .date-sync-hint {
-            font-size: 0.7rem;
-            color: #0369a1;
-            margin-top: 6px;
+            font-weight: 700;
+            color: var(--primary-color);
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 4px;
-            font-weight: 600;
+            border: 1px dashed #cbd5e1;
         }
-        .date-sync-hint i { color: #0ea5e9; font-size: 0.75rem; }
-        .date-converter .converter-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            background: #0ea5e9;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 0.65rem;
-            font-weight: 700;
-            margin-right: 6px;
-        }
-
-        #gregorianDateInput{
-            margin-left: 30px
-        }
-
-        /* ===== DUAL DATE CELLS IN TABLE ===== */
-        .date-us-cell {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            font-weight: 700;
-            color: #1e3c72;
-            font-size: 0.85rem;
-        }
-        .date-us-cell i {
+        .preview span:last-child {
+            font-size: 1.1rem;
             color: #16a34a;
-            font-size: 0.72rem;
         }
-        .date-af-cell {
+
+        /* ===== BUTTONS ===== */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 18px;
+            border: none;
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 700;
+            font-family: inherit;
+            transition: var(--transition);
+            text-decoration: none;
+            width: 100%;
+            margin-top: 6px;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+        .btn-green { background: #16a34a; }
+        .btn-green:hover { background: #15803d; }
+        .btn-red { background: #dc2626; }
+        .btn-red:hover { background: #b91c1c; }
+        .btn-blue { background: var(--primary-color); }
+        .btn-blue:hover { background: var(--secondary-color); }
+
+        .btn-sm {
             display: inline-flex;
             align-items: center;
             gap: 5px;
+            padding: 7px 12px;
+            border-radius: 8px;
+            font-size: 0.78rem;
             font-weight: 700;
-            color: #991b1b;
+            text-decoration: none;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            transition: var(--transition);
+        }
+        .btn-sm:hover { transform: translateY(-2px); }
+        .btn-edit { background: var(--primary-color); }
+        .btn-delete { background: #dc2626; }
+
+        .btn-cancel {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 12px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-weight: 600;
             font-size: 0.85rem;
         }
-        .date-af-cell i {
-            color: #e6b12e;
-            font-size: 0.72rem;
+        .btn-cancel:hover { color: var(--primary-color); }
+
+        /* ===== TABLE (FULLY RESPONSIVE) ===== */
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            -webkit-overflow-scrolling: touch;
         }
-
-        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 20px; border: none; border-radius: 10px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: var(--transition); font-family: inherit; text-decoration: none; }
-        .btn-primary { background: var(--primary-color); color: white; width: 100%; box-shadow: var(--shadow); }
-        .btn-primary:hover { background: var(--secondary-color); transform: translateY(-2px); box-shadow: 0 15px 30px rgba(30,60,114,0.2); }
-        .btn-secondary { background: var(--accent-color); color: var(--primary-color); box-shadow: var(--shadow); }
-        .btn-secondary:hover { background: #d4a017; transform: translateY(-2px); }
-        .btn-reset { background: #f1f5f9; color: var(--text-muted); border: 2px solid #e2e8f0; }
-        .btn-reset:hover { background: #e2e8f0; color: var(--primary-color); }
-
-        .filter-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-        .filter-tabs a { padding: 9px 18px; border-radius: 25px; text-decoration: none; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); background: #f1f5f9; transition: var(--transition); border: 2px solid transparent; }
-        .filter-tabs a:hover { background: #e2e8f0; color: var(--primary-color); transform: translateY(-2px); }
-        .filter-tabs a.active { background: var(--primary-color); color: white; box-shadow: 0 4px 12px rgba(30,60,114,0.25); }
-
-        .custom-filter { background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 18px; margin-bottom: 20px; }
-        .custom-filter .custom-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
-        .custom-filter .form-group { flex: 1; min-width: 140px; margin-bottom: 0; }
-        .custom-filter .btn { width: auto; padding: 12px 24px; }
-
-        .search-bar { background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 18px; margin-bottom: 20px; }
-        .search-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
-        .search-row .form-group { flex: 1; min-width: 160px; margin-bottom: 0; }
-        .search-row .btn { width: auto; padding: 12px 24px; }
-
-        .table-wrapper { overflow-x: auto; border-radius: 12px; border: 1px solid #e2e8f0; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.92rem; min-width: 1000px; }
+        table {
+            width: 100%;
+            min-width: 1050px;
+            border-collapse: collapse;
+            font-size: 0.88rem;
+            table-layout: auto;
+        }
         thead { background: var(--primary-color); }
-        th { padding: 15px; text-align: right; color: white; font-weight: 600; font-size: 0.85rem; white-space: nowrap; }
-        th small { font-weight: 400; opacity: 0.85; font-size: 0.7rem; }
-        td { padding: 14px 15px; border-bottom: 1px solid #e2e8f0; color: var(--text-color); text-align: right; }
+        th {
+            padding: 12px 10px;
+            text-align: right;
+            color: white;
+            font-weight: 600;
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+        td {
+            padding: 11px 10px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: right;
+            vertical-align: top;
+            /* Allow long notes to wrap instead of hiding */
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            white-space: normal;
+        }
         tbody tr:hover { background: #f8fafc; }
         tbody tr:last-child td { border-bottom: none; }
 
-        .amount-cell { font-weight: 700; color: var(--primary-color); }
-        .id-badge { display: inline-block; background: #f1f5f9; color: var(--text-muted); padding: 3px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
-        .type-badge { display: inline-block; background: #eff6ff; color: var(--primary-color); padding: 3px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
-        .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
-        .empty-state i { font-size: 2.5rem; color: #cbd5e1; margin-bottom: 12px; display: block; }
+        .amount-usd { color: #16a34a; font-weight: 700; white-space: nowrap; }
+        .amount-afn { color: #dc2626; font-weight: 700; white-space: nowrap; }
+        .amount-unpaid { color: #d97706; font-weight: 800; white-space: nowrap; }
+        .type-received { color: #16a34a; font-weight: 700; }
+        .type-paid { color: #dc2626; font-weight: 700; }
 
-        .btn-delete { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; background: var(--danger-color); color: white; text-decoration: none; transition: var(--transition); font-size: 0.85rem; }
-        .btn-delete:hover { background: #dc2626; transform: translateY(-2px); box-shadow: 0 6px 15px rgba(239,68,68,0.4); }
+        /* Notes column — readable, wraps */
+        td.note-cell {
+            min-width: 140px;
+            max-width: 260px;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            white-space: normal;
+            line-height: 1.5;
+            color: #475569;
+        }
 
-        .total-footer { margin-top: 20px; padding: 18px 24px; background: var(--primary-color); border-radius: var(--border-radius); display: flex; align-items: center; justify-content: space-between; color: white; box-shadow: 0 6px 20px rgba(30,60,114,0.2); }
-        .total-footer .total-label { display: flex; align-items: center; gap: 10px; font-size: 1rem; font-weight: 600; }
-        .total-footer .total-label i { color: var(--accent-color); font-size: 1.3rem; }
-        .total-footer .total-value { font-size: 1.6rem; font-weight: 800; color: var(--accent-color); }
-        @media (max-width: 768px) {
-            .page-header h1 { font-size: 1.4rem; }
-            .stat-info p { font-size: 1.2rem; }
-            .card { padding: 18px; }
+        .actions {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            flex-wrap: wrap;
+        }
+        .actions form { margin: 0; }
 
-            .custom-filter .custom-row, 
-            .search-row { 
-                flex-direction: column; 
-                align-items: stretch; 
-                gap: 12px;
+        .mini-empty {
+            text-align: center;
+            padding: 35px 15px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        .mini-empty i {
+            display: block;
+            font-size: 2rem;
+            color: #cbd5e1;
+            margin-bottom: 10px;
+        }
+
+        /* ===== MOBILE TABLE → STACKED CARDS ===== */
+        @media (max-width: 800px) {
+            .table-wrapper {
+                border: none;
+                overflow: visible;
             }
-            .custom-filter .btn, 
-            .search-row .btn { 
-                width: 100%; 
-            }
-
-            /* ✅ Mobile select full width fix */
-            .form-group select,
-            .search-row select,
-            .custom-filter select {
-                width: 100% !important;
-                max-width: 100% !important;
-                min-width: 0 !important;
-                box-sizing: border-box !important;
-                font-size: 16px !important;
-                padding: 12px 14px 12px 44px !important;
-                display: block !important;
-            }
-
-            /* ✅ Search row items full width */
-            .search-row .form-group,
-            .custom-filter .form-group {
-                width: 100% !important;
-                min-width: 0 !important;
-                flex: 1 1 100% !important;
-            }
-
-            /* ✅ Ensure wrapper doesn't overflow */
-            .form-group {
+            table,
+            thead,
+            tbody,
+            th,
+            td,
+            tr {
+                display: block;
                 width: 100%;
+            }
+            thead {
+                position: absolute;
+                top: -9999px;
+                left: -9999px;
+            }
+            tbody tr {
+                background: var(--card-bg);
+                border: 1px solid #e2e8f0;
+                border-radius: 12px;
+                margin-bottom: 12px;
+                padding: 10px 14px;
+                box-shadow: var(--shadow);
+            }
+            tbody tr:hover { background: var(--card-bg); }
+            td {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 14px;
+                text-align: right;
+                padding: 9px 0;
+                border-bottom: 1px dashed #e2e8f0;
+                white-space: normal;
+                word-break: break-word;
+                overflow-wrap: anywhere;
+                min-width: 0;
                 max-width: 100%;
             }
-        }
-                /* ✅ Global select fix for very small screens */
-        @media (max-width: 480px) {
-            .form-group select,
-            .search-row select {
-                font-size: 16px !important;
-                padding: 12px 12px 12px 42px !important;
-                background-position: left 10px center !important;
-                background-size: 14px !important;
+            td:last-child { border-bottom: none; }
+            td::before {
+                content: attr(data-label);
+                font-weight: 700;
+                color: var(--text-muted);
+                font-size: 0.78rem;
+                flex-shrink: 0;
+                min-width: 105px;
+                text-align: right;
+            }
+            td > * { max-width: 100%; }
+            td.note-cell {
+                min-width: 0;
+                max-width: 100%;
+            }
+            .actions {
+                justify-content: flex-start;
             }
         }
-    </style>
+
+        @media (max-width: 600px) {
+            .welcome-header .welcome-text h1 { font-size: 1.25rem; }
+            .stat-card .stat-value { font-size: 1.3rem; }
+            .section-card { padding: 18px; }
+        }
+</style>
+
 </head>
+
 <body>
 
 <?php include 'sidebar.php'; ?>
 
 <div class="main-content">
 
-    <!-- Page Header -->
-    <div class="page-header">
-        <div>
-            <h1><i class="fas fa-money-bill-exchange"></i> صرافي</h1>
-            <div class="subtitle">د پیسو راکړې ورکړې مدیریت کړئ</div>
+    <!-- ===== WELCOME HEADER ===== -->
+    <div class="welcome-header">
+        <div class="welcome-text">
+            <h1><i class="fas fa-exchange-alt"></i> صرافي حساب</h1>
+            <p>د صرافۍ د پیسو د راکړې ورکړې بشپړ مدیریت</p>
+        </div>
+        <div class="welcome-info">
+            <div class="user-chip">
+                <i class="fas fa-user-circle"></i>
+                <?php echo h($_SESSION['username'] ?? 'User'); ?>
+            </div>
+            <div class="date-chip">
+                <i class="fas fa-calendar-day"></i>
+                <?php echo date('Y-m-d'); ?>
+            </div>
         </div>
     </div>
 
-    <!-- Alerts -->
-    <?php if (!empty($success_msg)): ?>
-        <div class="alert alert-success"><i class="fas fa-check-circle"></i> <?php echo htmlspecialchars($success_msg); ?></div>
-    <?php endif; ?>
-    <?php if (!empty($error_msg)): ?>
-        <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <?php echo htmlspecialchars($error_msg); ?></div>
+    <?php if ($message): ?>
+        <div class="alert success">
+            <i class="fas fa-check-circle"></i>
+            <?= h($message) ?>
+        </div>
     <?php endif; ?>
 
-    <!-- Stats Cards -->
+    <?php if ($error): ?>
+        <div class="alert error">
+            <i class="fas fa-exclamation-circle"></i>
+            <?= h($error) ?>
+        </div>
+    <?php endif; ?>
+
+    <!-- ===== BALANCE SUMMARY ===== -->
     <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-icon total"><i class="fas fa-coins"></i></div>
-            <div class="stat-info">
-                <h3>ټوله اندازه</h3>
-                <p><?php echo number_format($total, 2); ?></p>
+
+        <div class="stat-card received">
+            <div class="stat-top">
+                <div class="stat-icon"><i class="fas fa-arrow-down"></i></div>
+                <span class="stat-badge">ترلاسه شوي</span>
+            </div>
+            <div class="stat-label">له صراف څخه ترلاسه شوي</div>
+            <div class="stat-value">$<?= number_format($totalReceived, 2) ?></div>
+            <div class="stat-sub">
+                <i class="fas fa-money-bill-wave"></i> ټول وخت
             </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon count"><i class="fas fa-receipt"></i></div>
-            <div class="stat-info">
-                <h3>ریکارډونه</h3>
-                <p><?php echo $stats_count; ?></p>
+
+        <div class="stat-card paid">
+            <div class="stat-top">
+                <div class="stat-icon"><i class="fas fa-arrow-up"></i></div>
+                <span class="stat-badge">ورکړل شوي</span>
+            </div>
+            <div class="stat-label">صراف ته ورکړل شوي</div>
+            <div class="stat-value">$<?= number_format($totalPaid, 2) ?></div>
+            <div class="stat-sub">
+                <i class="fas fa-hand-holding-usd"></i> ټول وخت
             </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon today"><i class="fas fa-calendar-day"></i></div>
-            <div class="stat-info">
-                <h3>نن</h3>
-                <p><?php echo number_format($today_total, 2); ?></p>
+
+        <div class="stat-card balance">
+            <div class="stat-top">
+                <div class="stat-icon"><i class="fas fa-wallet"></i></div>
+                <span class="stat-badge">موجود</span>
+            </div>
+            <div class="stat-label">اوسنی بیلانس (ډالر)</div>
+            <div class="stat-value">$<?= number_format($balance, 2) ?></div>
+            <div class="stat-sub">
+                <i class="fas fa-balance-scale"></i> ترلاسه شوي − ورکړل شوي
             </div>
         </div>
+
     </div>
 
-    <div class="content-grid">
+    <!-- ===== EDIT TRANSACTION FORM ===== -->
+    <?php if ($editData): ?>
 
-        <!-- Add Sarafe Form -->
-        <div class="card">
-            <div class="card-header">
-                <i class="fas fa-plus-circle"></i>
-                <h2>نوی ریکارډ اضافه کړئ</h2>
+    <div class="section-card blue">
+        <div class="section-header">
+            <div class="title">
+                <i class="fas fa-edit"></i>
+                د معاملې سمول #<?= h($editData["id"]) ?>
             </div>
+            <a href="sarafe.php" class="view-link">بېرته</a>
+        </div>
+
+        <form method="POST">
+            <input type="hidden" name="action" value="update">
+            <input type="hidden" name="id" value="<?= h($editData["id"]) ?>">
+
+            <div class="section-grid" style="margin-bottom:0;">
+                <div>
+                    <div class="form-group">
+                        <label><i class="fas fa-tags"></i> د معاملې ډول</label>
+                        <select name="transaction_type" id="edit_type" onchange="changeEditType()" required>
+                            <option value="received_from_saraf" <?= $editData["transaction_type"] === "received_from_saraf" ? "selected" : "" ?>>
+                                له صراف څخه ترلاسه شوي
+                            </option>
+                            <option value="paid_to_saraf" <?= $editData["transaction_type"] === "paid_to_saraf" ? "selected" : "" ?>>
+                                صراف ته ورکړل شوي
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label><i class="fas fa-calendar-alt"></i> نېټه</label>
+                        <input type="date" name="transaction_date" value="<?= h($editData["transaction_date"]) ?>" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label><i class="fas fa-coins"></i> اسعار</label>
+                        <select name="currency" id="edit_currency" onchange="changeEditCurrency()" required>
+                            <option value="CNY" <?= $editData["currency"] === "CNY" ? "selected" : "" ?>>Chinese Yuan (CNY)</option>
+                            <option value="AFN" <?= $editData["currency"] === "AFN" ? "selected" : "" ?>>Afghan Afghani (AFN)</option>
+                            <option value="USD" <?= $editData["currency"] === "USD" ? "selected" : "" ?>>US Dollar (USD)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="form-group">
+                        <label id="edit_amount_label"><i class="fas fa-money-bill"></i> مقدار</label>
+                        <input type="number" name="amount" id="edit_amount" step="0.01" min="0.01" value="<?= h($editData["amount"]) ?>" required>
+                    </div>
+
+                    <div class="form-group" id="edit_rate_box">
+                        <label id="edit_rate_label"><i class="fas fa-percentage"></i> د تبادلې نرخ</label>
+                        <input type="number" name="exchange_rate" id="edit_rate" step="0.0001" min="0.0001" value="<?= h($editData["exchange_rate"]) ?>">
+                    </div>
+
+                    <div class="preview">
+                        <span>ټول ډالر:</span>
+                        <span>$<span id="edit_total">0.00</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-sticky-note"></i> یادونه</label>
+                <textarea name="note"><?= h($editData["note"]) ?></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-blue">
+                <i class="fas fa-save"></i> معامله تازه کړه
+            </button>
+            <a href="sarafe.php" class="btn-cancel">
+                <i class="fas fa-times"></i> سمول لغوه کړه
+            </a>
+        </form>
+    </div>
+
+    <?php else: ?>
+
+    <!-- ===== NEW TRANSACTION FORMS ===== -->
+    <div class="section-grid">
+
+        <!-- MONEY RECEIVED -->
+        <div class="section-card green">
+            <div class="section-header">
+                <div class="title"><i class="fas fa-arrow-down"></i> له صراف څخه ترلاسه شوي</div>
+            </div>
+
             <form method="POST">
-                <input type="hidden" name="add_sarafe" value="1">
+                <input type="hidden" name="action" value="save">
+                <input type="hidden" name="transaction_type" value="received_from_saraf">
 
                 <div class="form-group">
-                    <label><i class="fas fa-box"></i> د توکي نوم *</label>
-                    <input type="text" name="item_name" placeholder="د توکي نوم ولیکئ" required>
+                    <label><i class="fas fa-calendar-alt"></i> نېټه</label>
+                    <input type="date" name="transaction_date" value="<?= date('Y-m-d') ?>" required>
                 </div>
-                <div class="form-group">
-                    <label><i class="fas fa-dollar-sign"></i> اندازه *</label>
-                    <input type="number" name="amount" step="0.01" placeholder="0.00" required>
-                </div>
-
-                <!-- ===== DATE CONVERTER ===== -->
-                <div class="date-converter">
-                    <div class="converter-title">
-                        <i class="fas fa-calendar-alt"></i>
-                        نیټه (دواړه تقویمونه)
-                        <span class="converter-badge"><i class="fas fa-sync-alt"></i> اتومات تړاو</span>
-                    </div>
-                    <div class="date-converter-row">
-                        <div class="date-field">
-                            <label><i class="fas fa-globe"></i> میلادی (US)</label>
-                            <input type="date" 
-                                   id="gregorianDateInput" 
-                                   value="<?php echo $today_date; ?>"  >
-                        </div>
-                        <div class="date-field">
-                            <label><i class="fas fa-moon"></i> هجري شمسي (افغاني)</label>
-                            <div class="afghan-date-input">
-                                <select id="afghanYearSelect"></select>
-                                <select id="afghanMonthSelect"></select>
-                                <select id="afghanDaySelect"></select>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="date-sync-hint">
-                        <i class="fas fa-info-circle"></i>
-                        یو تقویم بدل کړئ، بل به اتومات ډک شي
-                    </div>
-                </div>
-
-                <!-- Hidden input for the actual date sent to server -->
-                <input type="hidden" name="date" id="sarafeDateHidden" value="<?php echo $today_date; ?>">
 
                 <div class="form-group">
-                    <label><i class="fas fa-money-bill-wave"></i> د پیسو ډول *</label>
-                    <select name="money_type" required>
-                        <option value="">-- د پیسو ډول غوره کړئ --</option>
-                        <option value="چیني">چیني</option>
-                        <option value="افغاني">افغاني</option>
-                        <option value="ډالر">ډالر</option>
+                    <label><i class="fas fa-coins"></i> اسعار وټاکه</label>
+                    <select name="currency" id="receive_currency" onchange="changeReceiveCurrency()">
+                        <option value="CNY">Chinese Yuan (CNY)</option>
+                        <option value="USD">US Dollar (USD)</option>
                     </select>
                 </div>
+
+                <div class="form-group">
+                    <label id="receive_amount_label"><i class="fas fa-money-bill"></i> CNY مقدار</label>
+                    <input type="number" name="amount" id="receive_amount" step="0.01" min="0.01" placeholder="مقدار ولیکئ" required>
+                </div>
+
+                <div class="form-group" id="receive_rate_box">
+                    <label><i class="fas fa-percentage"></i> ۱ ډالر = څو یوان؟</label>
+                    <input type="number" name="exchange_rate" id="receive_rate" step="0.0001" min="0.0001" placeholder="مثال: 7.20" required>
+                </div>
+
+                <div class="preview">
+                    <span>ټول ډالر:</span>
+                    <span>$<span id="receive_total">0.00</span></span>
+                </div>
+
                 <div class="form-group">
                     <label><i class="fas fa-sticky-note"></i> یادونه</label>
-                    <textarea name="note" placeholder="اضافي یادونه"></textarea>
+                    <textarea name="note" placeholder="یادونه ولیکئ..."></textarea>
                 </div>
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-save"></i> ریکارډ اضافه کړئ
+
+                <button type="submit" class="btn btn-green">
+                    <i class="fas fa-save"></i> ترلاسه شوي ثبت کړه
                 </button>
             </form>
         </div>
 
-        <!-- Records List -->
-        <div class="card">
-            <div class="card-header">
+        <!-- MONEY PAID -->
+        <div class="section-card red">
+            <div class="section-header">
+                <div class="title"><i class="fas fa-arrow-up"></i> صراف ته ورکړل شوي</div>
+            </div>
+
+            <form method="POST">
+                <input type="hidden" name="action" value="save">
+                <input type="hidden" name="transaction_type" value="paid_to_saraf">
+
+                <div class="form-group">
+                    <label><i class="fas fa-calendar-alt"></i> نېټه</label>
+                    <input type="date" name="transaction_date" value="<?= date('Y-m-d') ?>" required>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-coins"></i> اسعار وټاکه</label>
+                    <select name="currency" id="paid_currency" onchange="changePaidCurrency()">
+                        <option value="AFN">Afghan Afghani (AFN)</option>
+                        <option value="USD">US Dollar (USD)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label id="paid_amount_label"><i class="fas fa-money-bill"></i> AFN مقدار</label>
+                    <input type="number" name="amount" id="paid_amount" step="0.01" min="0.01" placeholder="مقدار ولیکئ" required>
+                </div>
+
+                <div class="form-group" id="paid_rate_box">
+                    <label><i class="fas fa-percentage"></i> ۱ ډالر = څو افغانۍ؟</label>
+                    <input type="number" name="exchange_rate" id="paid_rate" step="0.0001" min="0.0001" placeholder="مثال: 70" required>
+                </div>
+
+                <div class="preview">
+                    <span>ټول ډالر:</span>
+                    <span>$<span id="paid_total">0.00</span></span>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-sticky-note"></i> یادونه</label>
+                    <textarea name="note" placeholder="یادونه ولیکئ..."></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-red">
+                    <i class="fas fa-save"></i> ورکړل شوي ثبت کړه
+                </button>
+            </form>
+        </div>
+
+    </div>
+
+    <?php endif; ?>
+
+    <!-- ===== TRANSACTION HISTORY ===== -->
+    <div class="section-card">
+        <div class="section-header">
+            <div class="title"><i class="fas fa-history"></i> د معاملو تاریخ</div>
+            <span class="view-link">
                 <i class="fas fa-list"></i>
-                <h2>د صرافي ریکارډونه (<?php echo $record_count; ?>)</h2>
-            </div>
+                <?= $history ? $history->num_rows : 0 ?> ریکارډونه
+            </span>
+        </div>
 
-            <!-- Filter Tabs -->
-            <div class="filter-tabs">
-                <a href="sarafe.php?filter=all" class="<?php echo $filter == 'all' ? 'active' : ''; ?>"><i class="fas fa-list"></i> ټول</a>
-                <a href="sarafe.php?filter=today" class="<?php echo $filter == 'today' ? 'active' : ''; ?>"><i class="fas fa-calendar-day"></i> نن</a>
-                <a href="sarafe.php?filter=yesterday" class="<?php echo $filter == 'yesterday' ? 'active' : ''; ?>"><i class="fas fa-calendar-minus"></i> پرون</a>
-                <a href="sarafe.php?filter=week" class="<?php echo $filter == 'week' ? 'active' : ''; ?>"><i class="fas fa-calendar-week"></i> دې اونۍ</a>
-                <a href="sarafe.php?filter=month" class="<?php echo $filter == 'month' ? 'active' : ''; ?>"><i class="fas fa-calendar-alt"></i> دې میاشت</a>
-            </div>
-
-            <!-- Custom Date Filter -->
-            <div class="custom-filter">
-                <form method="GET">
-                    <input type="hidden" name="filter" value="custom">
-                    <div class="custom-row">
-                        <div class="form-group">
-                            <label><i class="fas fa-calendar-plus"></i> له نېټې</label>
-                            <input type="date" name="from_date" required>
-                        </div>
-                        <div class="form-group">
-                            <label><i class="fas fa-calendar-check"></i> تر نېټې</label>
-                            <input type="date" name="to_date" required>
-                        </div>
-                        <button type="submit" class="btn btn-secondary">
-                            <i class="fas fa-filter"></i> فلټر
-                        </button>
-                    </div>
-                </form>
-            </div>
-
-            <!-- Search -->
-            <div class="search-bar">
-                <form method="GET">
-                    <div class="search-row">
-                        <div class="form-group">
-                            <label><i class="fas fa-search"></i> د توکي نوم پلټنه</label>
-                            <input type="text" name="search_name" placeholder="د توکي نوم ولیکئ" value="<?php echo htmlspecialchars($search_name); ?>">
-                        </div>
-                        <div class="form-group">
-                            <label><i class="fas fa-money-bill-wave"></i> د پیسو ډول</label>
-                            <select name="filter_type">
-                                <option value="">ټول ډولونه</option>
-                                <option value="چیني" <?php echo ($filter_type === 'چیني') ? 'selected' : ''; ?>>چیني</option>
-                                <option value="افغاني" <?php echo ($filter_type === 'افغاني') ? 'selected' : ''; ?>>افغاني</option>
-                                <option value="ډالر" <?php echo ($filter_type === 'ډالر') ? 'selected' : ''; ?>>ډالر</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="btn btn-secondary">
-                            <i class="fas fa-search"></i> پلټنه
-                        </button>
-                        <?php if ($search_name !== '' || $filter_type !== ''): ?>
-                            <a href="sarafe.php" class="btn btn-reset">
-                                <i class="fas fa-times"></i> پاکول
-                            </a>
-                        <?php endif; ?>
-                    </div>
-                </form>
-            </div>
-
-            <!-- Table -->
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>د توکي نوم</th>
-                            <th>اندازه</th>
-                            <th>میلادی نېټه<br><small>(US)</small></th>
-                            <th>افغاني نېټه<br><small>(هجري شمسي)</small></th>
-                            <th>د پیسو ډول</th>
-                            <th>یادونه</th>
-                            <th>کړنې</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (mysqli_num_rows($result) > 0): ?>
-                            <?php while ($row = mysqli_fetch_assoc($result)): ?>
-                                <tr>
-                                    <td><span class="id-badge">#<?php echo $row['id']; ?></span></td>
-                                    <td><?php echo htmlspecialchars($row['name']); ?></td>
-                                    <td class="amount-cell"><?php echo number_format($row['amount'], 2); ?></td>
-                                    <td>
-                                        <span class="date-us-cell">
-                                            <i class="fas fa-globe"></i>
-                                            <?php echo htmlspecialchars($row['date']); ?>
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span class="date-af-cell">
-                                            <i class="fas fa-moon"></i>
-                                            <?php echo formatAfghanDateFromGregorian($row['date']); ?>
-                                        </span>
-                                    </td>
-                                    <td><span class="type-badge"><?php echo htmlspecialchars($row['money_type']); ?></span></td>
-                                    <td><?php echo htmlspecialchars($row['note']); ?></td>
-                                    <td>
-                                        <a href="?delete_id=<?php echo $row['id']; ?>" 
-                                           class="btn-delete" 
-                                           title="ړنګول"
-                                           onclick="return confirm('ایا تاسو ډاډه یاست چې دا ریکارډ ړنګ کړئ؟');">
-                                            <i class="fas fa-trash"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                            <?php endwhile; ?>
-                        <?php else: ?>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>نېټه</th>
+                        <th>معامله</th>
+                        <th>اسعار</th>
+                        <th>مقدار</th>
+                        <th>د تبادلې نرخ</th>
+                        <th>ټول ډالر</th>
+                        <th>یادونه</th>
+                        <th>کړنې</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if ($history && $history->num_rows > 0): ?>
+                        <?php while ($row = $history->fetch_assoc()): ?>
                             <tr>
-                                <td colspan="8">
-                                    <div class="empty-state">
-                                        <i class="fas fa-inbox"></i>
-                                        د دې فلټر لپاره هیڅ ریکارډ ونه موندل شو.
+                                <td data-label="ID"><?= h($row["id"]) ?></td>
+                                <td data-label="نېټه"><?= h($row["transaction_date"]) ?></td>
+                                <td data-label="معامله">
+                                    <?php if ($row["transaction_type"] === "received_from_saraf"): ?>
+                                        <span class="type-received">
+                                            <i class="fas fa-arrow-down"></i> له صراف څخه
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="type-paid">
+                                            <i class="fas fa-arrow-up"></i> صراف ته
+                                        </span>
+                                    <?php endif; ?>
+                                </td>
+                                <td data-label="اسعار"><strong><?= h($row["currency"]) ?></strong></td>
+                                <td data-label="مقدار"><?= number_format((float)$row["amount"], 2) ?></td>
+                                <td data-label="د تبادلې نرخ"><?= number_format((float)$row["exchange_rate"], 4) ?></td>
+                                <td class="amount-usd" data-label="ټول ډالر">$<?= number_format((float)$row["usd_amount"], 2) ?></td>
+                                <td class="note-cell" data-label="یادونه"><?= h($row["note"]) ?></td>
+                                <td data-label="کړنې">
+                                    <div class="actions">
+                                        <a class="btn-sm btn-edit" href="sarafe.php?edit=<?= (int)$row["id"] ?>">
+                                            <i class="fas fa-edit"></i> سمول
+                                        </a>
+                                        <form method="POST" onsubmit="return confirm('ایا تاسو ډاډه یاست چې دا معامله حذف کړئ؟');">
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="id" value="<?= (int)$row["id"] ?>">
+                                            <button type="submit" class="btn-sm btn-delete">
+                                                <i class="fas fa-trash"></i> حذف
+                                            </button>
+                                        </form>
                                     </div>
                                 </td>
                             </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Total Footer -->
-            <div class="total-footer">
-                <div class="total-label">
-                    <i class="fas fa-calculator"></i>
-                    ټوله اندازه
-                </div>
-                <div class="total-value">
-                    <?php echo number_format($total, 2); ?>
-                </div>
-            </div>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="9">
+                                <div class="mini-empty">
+                                    <i class="fas fa-inbox"></i>
+                                    هیڅ معامله ونه موندل شوه.
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
-
     </div>
 
 </div>
 
 <script>
-    // ============================================
-    // AFGHAN DATE CONVERTER
-    // ============================================
-    const AFGHAN_MONTHS = [
-        'حمل', 'ثور', 'جوزا', 'سرطان', 'اسد', 'سنبله',
-        'میزان', 'عقرب', 'قوس', 'جدی', 'دلو', 'حوت'
-    ];
 
-    const gregorianDateInput = document.getElementById('gregorianDateInput');
-    const afghanYearSelect = document.getElementById('afghanYearSelect');
-    const afghanMonthSelect = document.getElementById('afghanMonthSelect');
-    const afghanDaySelect = document.getElementById('afghanDaySelect');
-    const sarafeDateHidden = document.getElementById('sarafeDateHidden');
+// ======================================
+// RECEIVED FROM SARAF
+// ======================================
 
-    function populateAfghanYears() {
-        const currentYear = parseInt('<?php echo $today_jy; ?>');
-        afghanYearSelect.innerHTML = '';
-        for (let y = currentYear - 30; y <= currentYear + 30; y++) {
-            const opt = document.createElement('option');
-            opt.value = y;
-            opt.textContent = y;
-            afghanYearSelect.appendChild(opt);
-        }
+function changeReceiveCurrency() {
+    let currency = document.getElementById("receive_currency").value;
+    let rateBox = document.getElementById("receive_rate_box");
+    let rate = document.getElementById("receive_rate");
+    let label = document.getElementById("receive_amount_label");
+
+    if (currency === "USD") {
+        rateBox.style.display = "none";
+        rate.required = false;
+        rate.value = "1";
+        label.innerHTML = '<i class="fas fa-money-bill"></i> USD مقدار';
+    } else {
+        rateBox.style.display = "block";
+        rate.required = true;
+        rate.value = "";
+        label.innerHTML = '<i class="fas fa-money-bill"></i> CNY مقدار';
     }
+    calculateReceive();
+}
 
-    function populateAfghanMonths() {
-        afghanMonthSelect.innerHTML = '';
-        AFGHAN_MONTHS.forEach((name, idx) => {
-            const opt = document.createElement('option');
-            opt.value = idx + 1;
-            opt.textContent = (idx + 1) + ' - ' + name;
-            afghanMonthSelect.appendChild(opt);
-        });
+function calculateReceive() {
+    let amount = parseFloat(document.getElementById("receive_amount").value) || 0;
+    let currency = document.getElementById("receive_currency").value;
+    let rate = currency === "USD" ? 1 : parseFloat(document.getElementById("receive_rate").value) || 0;
+    let total = rate > 0 ? amount / rate : 0;
+    document.getElementById("receive_total").innerText = total.toFixed(2);
+}
+
+document.getElementById("receive_amount").addEventListener("input", calculateReceive);
+document.getElementById("receive_rate").addEventListener("input", calculateReceive);
+
+
+// ======================================
+// PAID TO SARAF
+// ======================================
+
+function changePaidCurrency() {
+    let currency = document.getElementById("paid_currency").value;
+    let rateBox = document.getElementById("paid_rate_box");
+    let rate = document.getElementById("paid_rate");
+    let label = document.getElementById("paid_amount_label");
+
+    if (currency === "USD") {
+        rateBox.style.display = "none";
+        rate.required = false;
+        rate.value = "1";
+        label.innerHTML = '<i class="fas fa-money-bill"></i> USD مقدار';
+    } else {
+        rateBox.style.display = "block";
+        rate.required = true;
+        rate.value = "";
+        label.innerHTML = '<i class="fas fa-money-bill"></i> AFN مقدار';
     }
+    calculatePaid();
+}
 
-    function populateAfghanDays(jy, jm, selectedDay) {
-        afghanDaySelect.innerHTML = '';
-        let maxDays;
-        if (jm <= 6) maxDays = 31;
-        else if (jm <= 11) maxDays = 30;
-        else {
-            const isLeap = ((jy % 33) % 4 === 1);
-            maxDays = isLeap ? 30 : 29;
-        }
-        for (let d = 1; d <= maxDays; d++) {
-            const opt = document.createElement('option');
-            opt.value = d;
-            opt.textContent = d;
-            afghanDaySelect.appendChild(opt);
-        }
-        if (selectedDay && selectedDay <= maxDays) {
-            afghanDaySelect.value = selectedDay;
-        }
+function calculatePaid() {
+    let amount = parseFloat(document.getElementById("paid_amount").value) || 0;
+    let currency = document.getElementById("paid_currency").value;
+    let rate = currency === "USD" ? 1 : parseFloat(document.getElementById("paid_rate").value) || 0;
+    let total = rate > 0 ? amount / rate : 0;
+    document.getElementById("paid_total").innerText = total.toFixed(2);
+}
+
+document.getElementById("paid_amount").addEventListener("input", calculatePaid);
+document.getElementById("paid_rate").addEventListener("input", calculatePaid);
+
+
+// ======================================
+// EDIT FORM
+// ======================================
+
+function changeEditType() {
+    let type = document.getElementById("edit_type").value;
+    let currency = document.getElementById("edit_currency");
+
+    if (type === "received_from_saraf") {
+        currency.innerHTML = `
+            <option value="CNY">Chinese Yuan (CNY)</option>
+            <option value="USD">US Dollar (USD)</option>
+        `;
+    } else {
+        currency.innerHTML = `
+            <option value="AFN">Afghan Afghani (AFN)</option>
+            <option value="USD">US Dollar (USD)</option>
+        `;
     }
+    changeEditCurrency();
+}
 
-    function syncToAfghan() {
-        const val = gregorianDateInput.value;
-        if (!val) return;
-        const [gy, gm, gd] = val.split('-').map(Number);
+function changeEditCurrency() {
+    let currency = document.getElementById("edit_currency").value;
+    let rateBox = document.getElementById("edit_rate_box");
+    let rate = document.getElementById("edit_rate");
+    let label = document.getElementById("edit_amount_label");
 
-        fetch('?ajax_date_convert=1&type=to_afghan&gy=' + gy + '&gm=' + gm + '&gd=' + gd)
-            .then(r => r.json())
-            .then(data => {
-                if (!data.success) return;
-                afghanYearSelect.value = data.jy;
-                afghanMonthSelect.value = data.jm;
-                populateAfghanDays(data.jy, data.jm, data.jd);
-                afghanDaySelect.value = data.jd;
-                sarafeDateHidden.value = val;
-            })
-            .catch(err => console.error('Date convert error:', err));
+    if (currency === "USD") {
+        rateBox.style.display = "none";
+        rate.required = false;
+        rate.value = "1";
+        label.innerHTML = '<i class="fas fa-money-bill"></i> USD مقدار';
+    } else {
+        rateBox.style.display = "block";
+        rate.required = true;
+        if (rate.value === "1") rate.value = "";
+        label.innerHTML = '<i class="fas fa-money-bill"></i> ' + currency + ' مقدار';
     }
+    calculateEdit();
+}
 
-    function syncToGregorian() {
-        const jy = parseInt(afghanYearSelect.value);
-        const jm = parseInt(afghanMonthSelect.value);
-        const jd = parseInt(afghanDaySelect.value);
+function calculateEdit() {
+    let amount = parseFloat(document.getElementById("edit_amount").value) || 0;
+    let currency = document.getElementById("edit_currency").value;
+    let rate = currency === "USD" ? 1 : parseFloat(document.getElementById("edit_rate").value) || 0;
+    let total = rate > 0 ? amount / rate : 0;
+    document.getElementById("edit_total").innerText = total.toFixed(2);
+}
 
-        if (!jy || !jm || !jd) return;
+<?php if ($editData): ?>
+document.getElementById("edit_amount").addEventListener("input", calculateEdit);
+document.getElementById("edit_rate").addEventListener("input", calculateEdit);
+changeEditCurrency();
+<?php endif; ?>
 
-        fetch('?ajax_date_convert=1&type=to_gregorian&jy=' + jy + '&jm=' + jm + '&jd=' + jd)
-            .then(r => r.json())
-            .then(data => {
-                if (!data.success) return;
-                gregorianDateInput.value = data.gregorian;
-                sarafeDateHidden.value = data.gregorian;
-            })
-            .catch(err => console.error('Date convert error:', err));
-    }
-
-    gregorianDateInput.addEventListener('change', syncToAfghan);
-
-    afghanYearSelect.addEventListener('change', function() {
-        populateAfghanDays(
-            parseInt(afghanYearSelect.value),
-            parseInt(afghanMonthSelect.value),
-            parseInt(afghanDaySelect.value)
-        );
-        syncToGregorian();
-    });
-    afghanMonthSelect.addEventListener('change', function() {
-        populateAfghanDays(
-            parseInt(afghanYearSelect.value),
-            parseInt(afghanMonthSelect.value),
-            parseInt(afghanDaySelect.value)
-        );
-        syncToGregorian();
-    });
-    afghanDaySelect.addEventListener('change', syncToGregorian);
-
-    (function initDateConverter() {
-        populateAfghanYears();
-        populateAfghanMonths();
-
-        const initJy = parseInt('<?php echo $today_jy; ?>');
-        const initJm = parseInt('<?php echo $today_jm; ?>');
-        const initJd = parseInt('<?php echo $today_jd; ?>');
-
-        afghanYearSelect.value = initJy;
-        afghanMonthSelect.value = initJm;
-        populateAfghanDays(initJy, initJm, initJd);
-        afghanDaySelect.value = initJd;
-
-        sarafeDateHidden.value = gregorianDateInput.value;
-    })();
 </script>
 
 </body>
