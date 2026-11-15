@@ -1,15 +1,18 @@
 <?php
 // ======================================
-// 1. DATABASE CONNECTION
+// 1. SESSION + DATABASE CONNECTION (via db.php)
 // ======================================
 
-$conn = new mysqli("localhost", "root", "", "shop");
+session_start();
+require_once 'db.php';
 
-if ($conn->connect_error) {
-    die("Database connection failed: " . $conn->connect_error);
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit();
 }
 
-$conn->set_charset("utf8mb4");
+$current_user = $_SESSION['username'] ?? 'User';
+
 date_default_timezone_set("Asia/Kabul");
 
 $message = "";
@@ -802,7 +805,7 @@ function h($value) {
         <div class="welcome-info">
             <div class="user-chip">
                 <i class="fas fa-user-circle"></i>
-                <?php echo h($_SESSION['username'] ?? 'User'); ?>
+                <?php echo h($current_user); ?>
             </div>
             <div class="date-chip">
                 <i class="fas fa-calendar-day"></i>
