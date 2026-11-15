@@ -370,7 +370,7 @@ $history = $conn->query(
      ORDER BY transaction_date DESC, id DESC"
 );
 
-// Today's Afghan date for JS init
+// Today's dates for JS init
 $today_date = date('Y-m-d');
 [$today_jy, $today_jm, $today_jd] = gregorianToAfghan((int)date('Y'), (int)date('n'), (int)date('j'));
 
@@ -657,7 +657,7 @@ function h($value) {
         }
         textarea { min-height: 65px; resize: vertical; }
 
-        /* ===== DATE CONVERTER (from payments.php) ===== */
+        /* ===== DATE CONVERTER ===== */
         .date-converter {
             background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
             border: 2px solid #7dd3fc;
@@ -706,32 +706,15 @@ function h($value) {
             color: #0369a1;
         }
         .date-field label i { color: #0ea5e9; margin-left: 4px; }
-        .date-field input[type="date"] {
-            width: 100%;
-            padding: 10px 12px;
-            border: 2px solid #bae6fd;
-            border-radius: 10px;
-            font-size: 0.9rem;
-            font-family: inherit;
-            background: #ffffff;
-            color: #0c4a6e;
-            transition: var(--transition);
-            direction: ltr;
-            text-align: left;
-            min-height: 44px;
-        }
-        .date-field input[type="date"]:focus {
-            outline: none;
-            border-color: #0ea5e9;
-            box-shadow: 0 0 0 4px rgba(14,165,233,0.15);
-        }
-        .date-field .afghan-date-input {
+
+        /* 3-dropdown grid — same for US and AF */
+        .date-field .triple-date-input {
             display: grid;
             grid-template-columns: 1fr 1.4fr 1fr;
             gap: 6px;
             width: 100%;
         }
-        .date-field .afghan-date-input select {
+        .date-field .triple-date-input select {
             width: 100%;
             min-width: 0;
             padding: 10px 4px;
@@ -751,7 +734,7 @@ function h($value) {
             box-sizing: border-box;
             text-overflow: ellipsis;
         }
-        .date-field .afghan-date-input select:focus {
+        .date-field .triple-date-input select:focus {
             outline: none;
             border-color: #0ea5e9;
             box-shadow: 0 0 0 4px rgba(14,165,233,0.15);
@@ -1103,13 +1086,15 @@ function h($value) {
                             <div class="date-converter-row">
                                 <div class="date-field">
                                     <label><i class="fas fa-globe"></i> میلادی (US)</label>
-                                    <input type="date"
-                                           id="edit_gregorianDateInput"
-                                           value="<?= h($editData["transaction_date"]) ?>">
+                                    <div class="triple-date-input">
+                                        <select id="edit_usYearSelect"></select>
+                                        <select id="edit_usMonthSelect"></select>
+                                        <select id="edit_usDaySelect"></select>
+                                    </div>
                                 </div>
                                 <div class="date-field">
                                     <label><i class="fas fa-moon"></i> هجري شمسي (افغاني)</label>
-                                    <div class="afghan-date-input">
+                                    <div class="triple-date-input">
                                         <select id="edit_afghanYearSelect"></select>
                                         <select id="edit_afghanMonthSelect"></select>
                                         <select id="edit_afghanDaySelect"></select>
@@ -1195,13 +1180,15 @@ function h($value) {
                         <div class="date-converter-row">
                             <div class="date-field">
                                 <label><i class="fas fa-globe"></i> میلادی (US)</label>
-                                <input type="date"
-                                       id="receive_gregorianDateInput"
-                                       value="<?= $today_date ?>">
+                                <div class="triple-date-input">
+                                    <select id="receive_usYearSelect"></select>
+                                    <select id="receive_usMonthSelect"></select>
+                                    <select id="receive_usDaySelect"></select>
+                                </div>
                             </div>
                             <div class="date-field">
                                 <label><i class="fas fa-moon"></i> هجري شمسي (افغاني)</label>
-                                <div class="afghan-date-input">
+                                <div class="triple-date-input">
                                     <select id="receive_afghanYearSelect"></select>
                                     <select id="receive_afghanMonthSelect"></select>
                                     <select id="receive_afghanDaySelect"></select>
@@ -1274,13 +1261,15 @@ function h($value) {
                         <div class="date-converter-row">
                             <div class="date-field">
                                 <label><i class="fas fa-globe"></i> میلادی (US)</label>
-                                <input type="date"
-                                       id="paid_gregorianDateInput"
-                                       value="<?= $today_date ?>">
+                                <div class="triple-date-input">
+                                    <select id="paid_usYearSelect"></select>
+                                    <select id="paid_usMonthSelect"></select>
+                                    <select id="paid_usDaySelect"></select>
+                                </div>
                             </div>
                             <div class="date-field">
                                 <label><i class="fas fa-moon"></i> هجري شمسي (افغاني)</label>
-                                <div class="afghan-date-input">
+                                <div class="triple-date-input">
                                     <select id="paid_afghanYearSelect"></select>
                                     <select id="paid_afghanMonthSelect"></select>
                                     <select id="paid_afghanDaySelect"></select>
@@ -1423,20 +1412,33 @@ function h($value) {
 <script>
 
 // ======================================
-// AFGHAN DATE CONVERTER (from payments.php)
+// CONVERTER CONFIG
 // ======================================
 const AFGHAN_MONTHS = [
     'حمل', 'ثور', 'جوزا', 'سرطان', 'اسد', 'سنبله',
     'میزان', 'عقرب', 'قوس', 'جدی', 'دلو', 'حوت'
 ];
 
+const US_MONTHS = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+];
+
 const TODAY_JY = <?php echo (int)$today_jy; ?>;
 const TODAY_JM = <?php echo (int)$today_jm; ?>;
 const TODAY_JD = <?php echo (int)$today_jd; ?>;
 
-function populateYears(selectEl) {
+const TODAY_GY = <?php echo (int)date('Y'); ?>;
+const TODAY_GM = <?php echo (int)date('n'); ?>;
+const TODAY_GD = <?php echo (int)date('j'); ?>;
+
+
+// ======================================
+// POPULATE HELPERS
+// ======================================
+function populateYears(selectEl, centerYear) {
     selectEl.innerHTML = '';
-    for (let y = TODAY_JY - 30; y <= TODAY_JY + 30; y++) {
+    for (let y = centerYear - 30; y <= centerYear + 30; y++) {
         const opt = document.createElement('option');
         opt.value = y;
         opt.textContent = y;
@@ -1444,7 +1446,7 @@ function populateYears(selectEl) {
     }
 }
 
-function populateMonths(selectEl) {
+function populateAfghanMonths(selectEl) {
     selectEl.innerHTML = '';
     AFGHAN_MONTHS.forEach((name, idx) => {
         const opt = document.createElement('option');
@@ -1454,7 +1456,17 @@ function populateMonths(selectEl) {
     });
 }
 
-function populateDays(yearSelect, monthSelect, daySelect, jy, jm, selectedDay) {
+function populateUsMonths(selectEl) {
+    selectEl.innerHTML = '';
+    US_MONTHS.forEach((name, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx + 1;
+        opt.textContent = (idx + 1) + ' - ' + name;
+        selectEl.appendChild(opt);
+    });
+}
+
+function populateAfghanDays(yearSelect, monthSelect, daySelect, jy, jm, selectedDay) {
     daySelect.innerHTML = '';
     let maxDays;
     if (jm <= 6) maxDays = 31;
@@ -1474,96 +1486,153 @@ function populateDays(yearSelect, monthSelect, daySelect, jy, jm, selectedDay) {
     }
 }
 
-// ===== WIRE UP ONE DATE CONVERTER =====
+function populateUsDays(yearSelect, monthSelect, daySelect, gy, gm, selectedDay) {
+    daySelect.innerHTML = '';
+    // Gregorian month lengths
+    let maxDays;
+    if (gm === 2) {
+        maxDays = ((gy % 4 === 0 && gy % 100 !== 0) || (gy % 400 === 0)) ? 29 : 28;
+    } else if ([4,6,9,11].includes(gm)) {
+        maxDays = 30;
+    } else {
+        maxDays = 31;
+    }
+    for (let d = 1; d <= maxDays; d++) {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = d;
+        daySelect.appendChild(opt);
+    }
+    if (selectedDay && selectedDay <= maxDays) {
+        daySelect.value = selectedDay;
+    }
+}
+
+
+// ======================================
+// SETUP ONE DATE CONVERTER (both sides triple)
+// ======================================
 function setupDateConverter(prefix) {
-    const gregInput = document.getElementById(prefix + '_gregorianDateInput');
-    const yearSel   = document.getElementById(prefix + '_afghanYearSelect');
-    const monthSel  = document.getElementById(prefix + '_afghanMonthSelect');
-    const daySel    = document.getElementById(prefix + '_afghanDaySelect');
-    const hidden    = document.getElementById(prefix + '_dateHidden');
+    const usYear   = document.getElementById(prefix + '_usYearSelect');
+    const usMonth  = document.getElementById(prefix + '_usMonthSelect');
+    const usDay    = document.getElementById(prefix + '_usDaySelect');
+    const afYear   = document.getElementById(prefix + '_afghanYearSelect');
+    const afMonth  = document.getElementById(prefix + '_afghanMonthSelect');
+    const afDay    = document.getElementById(prefix + '_afghanDaySelect');
+    const hidden   = document.getElementById(prefix + '_dateHidden');
 
-    if (!gregInput || !yearSel || !monthSel || !daySel || !hidden) return;
+    if (!usYear || !usMonth || !usDay || !afYear || !afMonth || !afDay || !hidden) return;
 
-    populateYears(yearSel);
-    populateMonths(monthSel);
+    // Populate all six dropdowns
+    populateYears(usYear, TODAY_GY);
+    populateUsMonths(usMonth);
+    populateYears(afYear, TODAY_JY);
+    populateAfghanMonths(afMonth);
 
-    // Initial sync from the existing gregorian value
-    const initGreg = gregInput.value;
+    // Initialize from hidden (which contains the current Gregorian Y-m-d)
+    const initGreg = hidden.value || '';
+
     if (initGreg) {
         const [gy, gm, gd] = initGreg.split('-').map(Number);
+        // Set US side immediately
+        usYear.value = gy;
+        usMonth.value = gm;
+        populateUsDays(usYear, usMonth, usDay, gy, gm, gd);
+        usDay.value = gd;
+
+        // Sync AF side from the Gregorian value
         fetch('?ajax_date_convert=1&type=to_afghan&gy=' + gy + '&gm=' + gm + '&gd=' + gd)
             .then(r => r.json())
             .then(data => {
                 if (!data.success) return;
-                yearSel.value = data.jy;
-                monthSel.value = data.jm;
-                populateDays(yearSel, monthSel, daySel, data.jy, data.jm, data.jd);
-                daySel.value = data.jd;
-                hidden.value = initGreg;
+                afYear.value = data.jy;
+                afMonth.value = data.jm;
+                populateAfghanDays(afYear, afMonth, afDay, data.jy, data.jm, data.jd);
+                afDay.value = data.jd;
             })
             .catch(err => console.error('Init convert error:', err));
     } else {
-        yearSel.value = TODAY_JY;
-        monthSel.value = TODAY_JM;
-        populateDays(yearSel, monthSel, daySel, TODAY_JY, TODAY_JM, TODAY_JD);
-        daySel.value = TODAY_JD;
+        // Fallback to today
+        usYear.value = TODAY_GY;
+        usMonth.value = TODAY_GM;
+        populateUsDays(usYear, usMonth, usDay, TODAY_GY, TODAY_GM, TODAY_GD);
+        usDay.value = TODAY_GD;
+
+        afYear.value = TODAY_JY;
+        afMonth.value = TODAY_JM;
+        populateAfghanDays(afYear, afMonth, afDay, TODAY_JY, TODAY_JM, TODAY_JD);
+        afDay.value = TODAY_JD;
+
+        hidden.value = TODAY_GY + '-' + String(TODAY_GM).padStart(2,'0') + '-' + String(TODAY_GD).padStart(2,'0');
     }
 
-    // US → AF
-    gregInput.addEventListener('change', function() {
-        const val = this.value;
-        if (!val) return;
-        const [gy, gm, gd] = val.split('-').map(Number);
+    // ===== US → AF (when any US dropdown changes) =====
+    function onUsChange() {
+        const gy = parseInt(usYear.value);
+        const gm = parseInt(usMonth.value);
+        let gd = parseInt(usDay.value);
+
+        // Rebuild days based on new year/month
+        populateUsDays(usYear, usMonth, usDay, gy, gm, gd);
+        gd = parseInt(usDay.value);
+
+        // Update hidden immediately
+        hidden.value = gy + '-' + String(gm).padStart(2,'0') + '-' + String(gd).padStart(2,'0');
+
+        // Convert to Afghan
         fetch('?ajax_date_convert=1&type=to_afghan&gy=' + gy + '&gm=' + gm + '&gd=' + gd)
             .then(r => r.json())
             .then(data => {
                 if (!data.success) return;
-                yearSel.value = data.jy;
-                monthSel.value = data.jm;
-                populateDays(yearSel, monthSel, daySel, data.jy, data.jm, data.jd);
-                daySel.value = data.jd;
-                hidden.value = val;
+                afYear.value = data.jy;
+                afMonth.value = data.jm;
+                populateAfghanDays(afYear, afMonth, afDay, data.jy, data.jm, data.jd);
+                afDay.value = data.jd;
             })
             .catch(err => console.error('Convert error:', err));
-    });
+    }
 
-    // AF → US
-    function syncToGregorian() {
-        const jy = parseInt(yearSel.value);
-        const jm = parseInt(monthSel.value);
-        const jd = parseInt(daySel.value);
-        if (!jy || !jm || !jd) return;
+    usYear.addEventListener('change', onUsChange);
+    usMonth.addEventListener('change', onUsChange);
+    usDay.addEventListener('change', onUsChange);
+
+    // ===== AF → US (when any AF dropdown changes) =====
+    function onAfChange() {
+        const jy = parseInt(afYear.value);
+        const jm = parseInt(afMonth.value);
+        let jd = parseInt(afDay.value);
+
+        // Rebuild days based on new year/month
+        populateAfghanDays(afYear, afMonth, afDay, jy, jm, jd);
+        jd = parseInt(afDay.value);
+
         fetch('?ajax_date_convert=1&type=to_gregorian&jy=' + jy + '&jm=' + jm + '&jd=' + jd)
             .then(r => r.json())
             .then(data => {
                 if (!data.success) return;
-                gregInput.value = data.gregorian;
+                usYear.value = data.gy;
+                usMonth.value = data.gm;
+                populateUsDays(usYear, usMonth, usDay, data.gy, data.gm, data.gd);
+                usDay.value = data.gd;
                 hidden.value = data.gregorian;
             })
             .catch(err => console.error('Convert error:', err));
     }
 
-    yearSel.addEventListener('change', function() {
-        populateDays(yearSel, monthSel, daySel, parseInt(yearSel.value), parseInt(monthSel.value), parseInt(daySel.value));
-        syncToGregorian();
-    });
-    monthSel.addEventListener('change', function() {
-        populateDays(yearSel, monthSel, daySel, parseInt(yearSel.value), parseInt(monthSel.value), parseInt(daySel.value));
-        syncToGregorian();
-    });
-    daySel.addEventListener('change', syncToGregorian);
+    afYear.addEventListener('change', onAfChange);
+    afMonth.addEventListener('change', onAfChange);
+    afDay.addEventListener('change', onAfChange);
 }
 
 // ===== INIT ALL 3 CONVERTERS =====
 document.addEventListener('DOMContentLoaded', function() {
-    // Edit form only exists if editData is set
-    if (document.getElementById('edit_gregorianDateInput')) {
+    if (document.getElementById('edit_usYearSelect')) {
         setupDateConverter('edit');
     }
-    if (document.getElementById('receive_gregorianDateInput')) {
+    if (document.getElementById('receive_usYearSelect')) {
         setupDateConverter('receive');
     }
-    if (document.getElementById('paid_gregorianDateInput')) {
+    if (document.getElementById('paid_usYearSelect')) {
         setupDateConverter('paid');
     }
 });
