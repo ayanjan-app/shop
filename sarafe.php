@@ -20,6 +20,116 @@ $error = "";
 
 
 // ======================================
+// 1b. AFGHAN (JALALI / SOLAR HIJRI) DATE CONVERTER
+// ======================================
+
+function gregorianToJalali($gy, $gm, $gd) {
+    $g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+
+    if ($gy > 1600) {
+        $jy = 979;
+        $gy -= 1600;
+    } else {
+        $jy = 0;
+        $gy -= 621;
+    }
+
+    $gy2 = ($gm > 2) ? ($gy + 1) : $gy;
+    $days = (365 * $gy) + ((int)(($gy2 + 3) / 4)) - ((int)(($gy2 + 99) / 100))
+          + ((int)(($gy2 + 399) / 400)) - 80 + $gd + $g_d_m[$gm - 1];
+
+    $jy += 33 * ((int)($days / 12053));
+    $days %= 12053;
+
+    $jy += 4 * ((int)($days / 1461));
+    $days %= 1461;
+
+    if ($days > 365) {
+        $jy += (int)(($days - 1) / 365);
+        $days = ($days - 1) % 365;
+    }
+
+    if ($days < 186) {
+        $jm = 1 + (int)($days / 31);
+        $jd = 1 + ($days % 31);
+    } else {
+        $jm = 7 + (int)(($days - 186) / 30);
+        $jd = 1 + (($days - 186) % 30);
+    }
+
+    return [$jy, $jm, $jd];
+}
+
+function jalaliToGregorian($jy, $jm, $jd) {
+    if ($jy > 979) {
+        $gy = 1600;
+        $jy -= 979;
+    } else {
+        $gy = 621;
+    }
+
+    $days = (365 * $jy) + (((int)($jy / 33)) * 8) + ((int)((($jy % 33) + 3) / 4))
+          + 78 + $jd + (($jm < 7) ? ($jm - 1) * 31 : (($jm - 7) * 30) + 186);
+
+    $gy += 400 * ((int)($days / 146097));
+    $days %= 146097;
+
+    if ($days > 36524) {
+        $gy += 100 * ((int)(--$days / 36524));
+        $days %= 36524;
+        if ($days >= 365) $days++;
+    }
+
+    $gy += 4 * ((int)($days / 1461));
+    $days %= 1461;
+
+    if ($days > 365) {
+        $gy += (int)(($days - 1) / 365);
+        $days = ($days - 1) % 365;
+    }
+
+    $gd = $days + 1;
+
+    $sal_a = [0, 31, ($gy % 4 == 0 && $gy % 100 != 0) || ($gy % 400 == 0) ? 29 : 28,
+              31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+    for ($gm = 1; $gm <= 12 && $gd > $sal_a[$gm]; $gm++) {
+        $gd -= $sal_a[$gm];
+    }
+
+    return [$gy, $gm, $gd];
+}
+
+function faDate($gregorian, $withMonthName = false) {
+    if (empty($gregorian) || $gregorian === '0000-00-00') return '—';
+
+    $ts = strtotime($gregorian);
+    if ($ts === false) return htmlspecialchars((string)$gregorian);
+
+    $gy = (int)date('Y', $ts);
+    $gm = (int)date('n', $ts);
+    $gd = (int)date('j', $ts);
+
+    [$jy, $jm, $jd] = gregorianToJalali($gy, $gm, $gd);
+
+    if ($withMonthName) {
+        $months = [
+            1  => 'حمل', 2  => 'ثور', 3  => 'جوزا', 4  => 'سرطان',
+            5  => 'اسد', 6  => 'سنبله', 7  => 'میزان', 8  => 'عقرب',
+            9  => 'قوس', 10 => 'جدي', 11 => 'دلو', 12 => 'حوت',
+        ];
+        return sprintf('%d %s %d', $jd, $months[$jm], $jy);
+    }
+
+    return sprintf('%04d/%02d/%02d', $jy, $jm, $jd);
+}
+
+function faToday($withMonthName = false) {
+    return faDate(date('Y-m-d'), $withMonthName);
+}
+
+
+// ======================================
 // 2. COMMON VALIDATION FUNCTION
 // ======================================
 
@@ -43,10 +153,7 @@ function validTransaction($type, $currency, $date, $amount, $rate) {
         $rate = 1;
     }
 
-    return $validType &&
-        $validDate &&
-        $amount > 0 &&
-        $rate > 0;
+    return $validType && $validDate && $amount > 0 && $rate > 0;
 }
 
 
@@ -71,13 +178,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
             header("Location: sarafe.php?deleted=1");
             exit;
         } else {
-            $error = "Transaction not found or could not be deleted.";
+            $error = "معامله ونه موندل شوه یا حذف نه شوه.";
         }
 
         $stmt->close();
 
     } else {
-        $error = "Invalid transaction ID.";
+        $error = "د معاملې ID سم نه دی.";
     }
 }
 
@@ -108,15 +215,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
 
     if (!validTransaction($type, $currency, $date, $amount, $rate)) {
 
-        $error = "Please enter valid transaction information.";
+        $error = "مهرباني وکړئ سم معلومات ولیکئ.";
 
     } elseif ($action === "update" && $id <= 0) {
 
-        $error = "Invalid transaction ID.";
+        $error = "د معاملې ID سم نه دی.";
 
     } else {
 
-        // Calculate USD amount
         $usdAmount = round($amount / $rate, 2);
 
         if ($action === "save") {
@@ -130,18 +236,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
 
             $stmt->bind_param(
                 "sssddds",
-                $type,
-                $date,
-                $currency,
-                $amount,
-                $rate,
-                $usdAmount,
-                $note
+                $type, $date, $currency,
+                $amount, $rate, $usdAmount, $note
             );
 
         } else {
 
-            // Update existing transaction
             $sql = "UPDATE saraf_transactions SET
                     transaction_type = ?,
                     transaction_date = ?,
@@ -156,14 +256,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
 
             $stmt->bind_param(
                 "sssdddsi",
-                $type,
-                $date,
-                $currency,
-                $amount,
-                $rate,
-                $usdAmount,
-                $note,
-                $id
+                $type, $date, $currency,
+                $amount, $rate, $usdAmount, $note, $id
             );
         }
 
@@ -178,7 +272,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
             exit;
 
         } else {
-            $error = "Transaction could not be saved.";
+            $error = "معامله ثبت نه شوه.";
         }
 
         $stmt->close();
@@ -187,20 +281,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" &&
 
 
 // ======================================
-// 5. SUCCESS MESSAGES
+// 5. SUCCESS MESSAGES (Pashto)
 // ======================================
 
-if (isset($_GET["success"])) {
-    $message = "Transaction saved successfully!";
-}
-
-if (isset($_GET["updated"])) {
-    $message = "Transaction updated successfully!";
-}
-
-if (isset($_GET["deleted"])) {
-    $message = "Transaction deleted successfully!";
-}
+if (isset($_GET["success"])) $message = "معامله په بریالیتوب سره ثبت شوه!";
+if (isset($_GET["updated"])) $message = "معامله په بریالیتوب سره تازه شوه!";
+if (isset($_GET["deleted"])) $message = "معامله په بریالیتوب سره حذف شوه!";
 
 
 // ======================================
@@ -228,7 +314,7 @@ if (isset($_GET["edit"])) {
         $stmt->close();
 
         if (!$editData) {
-            $error = "Transaction not found.";
+            $error = "معامله ونه موندل شوه.";
         }
     }
 }
@@ -239,30 +325,15 @@ if (isset($_GET["edit"])) {
 // ======================================
 
 $sql = "SELECT
-
-    COALESCE(SUM(
-        CASE
-            WHEN transaction_type = 'received_from_saraf'
-            THEN usd_amount ELSE 0
-        END
-    ), 0) AS total_received,
-
-    COALESCE(SUM(
-        CASE
-            WHEN transaction_type = 'paid_to_saraf'
-            THEN usd_amount ELSE 0
-        END
-    ), 0) AS total_paid
-
+    COALESCE(SUM(CASE WHEN transaction_type = 'received_from_saraf' THEN usd_amount ELSE 0 END), 0) AS total_received,
+    COALESCE(SUM(CASE WHEN transaction_type = 'paid_to_saraf'     THEN usd_amount ELSE 0 END), 0) AS total_paid
     FROM saraf_transactions";
 
 $result = $conn->query($sql);
-
 $summary = $result->fetch_assoc();
 
 $totalReceived = (float)$summary["total_received"];
 $totalPaid = (float)$summary["total_paid"];
-
 $balance = $totalReceived - $totalPaid;
 
 
@@ -379,16 +450,8 @@ function h($value) {
             align-items: center;
             gap: 10px;
         }
-        .alert.success {
-            background: #dcfce7;
-            color: #166534;
-            border: 1px solid #86efac;
-        }
-        .alert.error {
-            background: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #fca5a5;
-        }
+        .alert.success { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+        .alert.error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
 
         /* ===== STATS GRID ===== */
         .stats-grid {
@@ -407,10 +470,7 @@ function h($value) {
             position: relative;
             overflow: hidden;
         }
-        .stat-card:hover {
-            transform: translateY(-4px);
-            box-shadow: var(--shadow-hover);
-        }
+        .stat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
         .stat-card::before {
             content: '';
             position: absolute;
@@ -461,8 +521,13 @@ function h($value) {
             font-size: 0.78rem;
             margin-top: 6px;
         }
-        .stat-card.received { --card-accent: #16a34a; }
-        .stat-card.paid { --card-accent: #dc2626; }
+        /* RECEIVED = RED (saraf gave me money) */
+        .stat-card.received { --card-accent: #dc2626; }
+        .stat-card.received .stat-value { color: #dc2626; }
+        /* PAID = GREEN (I gave money to saraf) */
+        .stat-card.paid { --card-accent: #16a34a; }
+        .stat-card.paid .stat-value { color: #16a34a; }
+        /* BALANCE = AMBER */
         .stat-card.balance { --card-accent: #f59e0b; }
 
         /* ===== SECTION GRID / CARDS ===== */
@@ -492,8 +557,12 @@ function h($value) {
             height: 4px;
             background: var(--accent-color);
         }
-        .section-card.green::before { background: #16a34a; }
-        .section-card.red::before { background: #dc2626; }
+        /* RECEIVED form card = RED */
+        .section-card.green::before { background: #dc2626; }
+        .section-card.green .section-header .title i { color: #dc2626; }
+        /* PAID form card = GREEN */
+        .section-card.red::before { background: #16a34a; }
+        .section-card.red .section-header .title i { color: #16a34a; }
         .section-card.blue::before { background: #3b82f6; }
 
         .section-card .section-header {
@@ -518,8 +587,6 @@ function h($value) {
             color: var(--accent-color);
             font-size: 1.15rem;
         }
-        .section-card.green .section-header .title i { color: #16a34a; }
-        .section-card.red .section-header .title i { color: #dc2626; }
         .section-card.blue .section-header .title i { color: #3b82f6; }
 
         .section-card .section-header .view-link {
@@ -565,10 +632,39 @@ function h($value) {
             border-color: var(--primary-color);
             box-shadow: 0 0 0 3px rgba(30,60,114,0.12);
         }
-        textarea {
-            min-height: 65px;
-            resize: vertical;
+        textarea { min-height: 65px; resize: vertical; }
+
+        /* ===== DUAL DATE INPUT ===== */
+        .dual-date {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
         }
+        @media (max-width: 500px) {
+            .dual-date { grid-template-columns: 1fr; }
+        }
+        .dual-date .date-field { position: relative; }
+        .dual-date .date-field .date-flag {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            background: #f1f5f9;
+            padding: 2px 8px;
+            border-radius: 8px;
+            margin-bottom: 4px;
+        }
+        .dual-date .date-field.us .date-flag { color: #16a34a; background: #dcfce7; }
+        .dual-date .date-field.af .date-flag { color: #d97706; background: #fef3c7; }
+        .dual-date .date-field input { font-size: 0.9rem; }
+        .dual-date .date-field.af input {
+            direction: ltr;
+            text-align: left;
+            letter-spacing: 0.5px;
+        }
+
         .preview {
             background: #f1f5f9;
             padding: 13px 16px;
@@ -606,10 +702,12 @@ function h($value) {
             margin-top: 6px;
         }
         .btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
-        .btn-green { background: #16a34a; }
-        .btn-green:hover { background: #15803d; }
-        .btn-red { background: #dc2626; }
-        .btn-red:hover { background: #b91c1c; }
+        /* Received button = RED */
+        .btn-green { background: #dc2626; }
+        .btn-green:hover { background: #b91c1c; }
+        /* Paid button = GREEN */
+        .btn-red { background: #16a34a; }
+        .btn-red:hover { background: #15803d; }
         .btn-blue { background: var(--primary-color); }
         .btn-blue:hover { background: var(--secondary-color); }
 
@@ -644,7 +742,7 @@ function h($value) {
         }
         .btn-cancel:hover { color: var(--primary-color); }
 
-        /* ===== TABLE (FULLY RESPONSIVE) ===== */
+        /* ===== TABLE ===== */
         .table-wrapper {
             overflow-x: auto;
             border-radius: 12px;
@@ -653,7 +751,7 @@ function h($value) {
         }
         table {
             width: 100%;
-            min-width: 1050px;
+            min-width: 1150px;
             border-collapse: collapse;
             font-size: 0.88rem;
             table-layout: auto;
@@ -672,7 +770,6 @@ function h($value) {
             border-bottom: 1px solid #e2e8f0;
             text-align: right;
             vertical-align: top;
-            /* Allow long notes to wrap instead of hiding */
             word-break: break-word;
             overflow-wrap: anywhere;
             white-space: normal;
@@ -683,10 +780,14 @@ function h($value) {
         .amount-usd { color: #16a34a; font-weight: 700; white-space: nowrap; }
         .amount-afn { color: #dc2626; font-weight: 700; white-space: nowrap; }
         .amount-unpaid { color: #d97706; font-weight: 800; white-space: nowrap; }
-        .type-received { color: #16a34a; font-weight: 700; }
-        .type-paid { color: #dc2626; font-weight: 700; }
 
-        /* Notes column — readable, wraps */
+        /* Table type colors (FLIPPED) */
+        .type-received { color: #dc2626; font-weight: 700; }  /* Received = RED */
+        .type-paid { color: #16a34a; font-weight: 700; }      /* Paid = GREEN */
+
+        .date-us { color: #16a34a; font-weight: 600; white-space: nowrap; }
+        .date-af { color: #d97706; font-weight: 600; white-space: nowrap; }
+
         td.note-cell {
             min-width: 140px;
             max-width: 260px;
@@ -720,19 +821,8 @@ function h($value) {
 
         /* ===== MOBILE TABLE → STACKED CARDS ===== */
         @media (max-width: 800px) {
-            .table-wrapper {
-                border: none;
-                overflow: visible;
-            }
-            table,
-            thead,
-            tbody,
-            th,
-            td,
-            tr {
-                display: block;
-                width: 100%;
-            }
+            .table-wrapper { border: none; overflow: visible; }
+            table, thead, tbody, th, td, tr { display: block; width: 100%; }
             thead {
                 position: absolute;
                 top: -9999px;
@@ -772,13 +862,8 @@ function h($value) {
                 text-align: right;
             }
             td > * { max-width: 100%; }
-            td.note-cell {
-                min-width: 0;
-                max-width: 100%;
-            }
-            .actions {
-                justify-content: flex-start;
-            }
+            td.note-cell { min-width: 0; max-width: 100%; }
+            .actions { justify-content: flex-start; }
         }
 
         @media (max-width: 600px) {
@@ -809,7 +894,7 @@ function h($value) {
             </div>
             <div class="date-chip">
                 <i class="fas fa-calendar-day"></i>
-                <?php echo date('Y-m-d'); ?>
+                <?php echo faToday(true); ?>
             </div>
         </div>
     </div>
@@ -831,6 +916,7 @@ function h($value) {
     <!-- ===== BALANCE SUMMARY ===== -->
     <div class="stats-grid">
 
+        <!-- RECEIVED (from saraf) = RED -->
         <div class="stat-card received">
             <div class="stat-top">
                 <div class="stat-icon"><i class="fas fa-arrow-down"></i></div>
@@ -843,6 +929,7 @@ function h($value) {
             </div>
         </div>
 
+        <!-- PAID (to saraf) = GREEN -->
         <div class="stat-card paid">
             <div class="stat-top">
                 <div class="stat-icon"><i class="fas fa-arrow-up"></i></div>
@@ -901,7 +988,24 @@ function h($value) {
 
                     <div class="form-group">
                         <label><i class="fas fa-calendar-alt"></i> نېټه</label>
-                        <input type="date" name="transaction_date" value="<?= h($editData["transaction_date"]) ?>" required>
+                        <div class="dual-date">
+                            <div class="date-field us">
+                                <span class="date-flag"><i class="fas fa-flag-usa"></i> میلادي (US)</span>
+                                <input type="date"
+                                       name="transaction_date"
+                                       id="edit_date_us"
+                                       value="<?= h($editData["transaction_date"]) ?>"
+                                       oninput="onEditDateUS()" required>
+                            </div>
+                            <div class="date-field af">
+                                <span class="date-flag"><i class="fas fa-moon"></i> هجري شمسي (AF)</span>
+                                <input type="text"
+                                       id="edit_date_af"
+                                       placeholder="1405/08/24"
+                                       value="<?= h(faDate($editData["transaction_date"], false)) ?>"
+                                       oninput="onEditDateAF()">
+                            </div>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -951,7 +1055,7 @@ function h($value) {
     <!-- ===== NEW TRANSACTION FORMS ===== -->
     <div class="section-grid">
 
-        <!-- MONEY RECEIVED -->
+        <!-- MONEY RECEIVED = RED -->
         <div class="section-card green">
             <div class="section-header">
                 <div class="title"><i class="fas fa-arrow-down"></i> له صراف څخه ترلاسه شوي</div>
@@ -963,7 +1067,24 @@ function h($value) {
 
                 <div class="form-group">
                     <label><i class="fas fa-calendar-alt"></i> نېټه</label>
-                    <input type="date" name="transaction_date" value="<?= date('Y-m-d') ?>" required>
+                    <div class="dual-date">
+                        <div class="date-field us">
+                            <span class="date-flag"><i class="fas fa-flag-usa"></i> میلادي (US)</span>
+                            <input type="date"
+                                   name="transaction_date"
+                                   id="receive_date_us"
+                                   value="<?= date('Y-m-d') ?>"
+                                   oninput="onReceiveDateUS()" required>
+                        </div>
+                        <div class="date-field af">
+                            <span class="date-flag"><i class="fas fa-moon"></i> هجري شمسي (AF)</span>
+                            <input type="text"
+                                   id="receive_date_af"
+                                   placeholder="1405/08/24"
+                                   value="<?= h(faToday(false)) ?>"
+                                   oninput="onReceiveDateAF()">
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -1000,7 +1121,7 @@ function h($value) {
             </form>
         </div>
 
-        <!-- MONEY PAID -->
+        <!-- MONEY PAID = GREEN -->
         <div class="section-card red">
             <div class="section-header">
                 <div class="title"><i class="fas fa-arrow-up"></i> صراف ته ورکړل شوي</div>
@@ -1012,7 +1133,24 @@ function h($value) {
 
                 <div class="form-group">
                     <label><i class="fas fa-calendar-alt"></i> نېټه</label>
-                    <input type="date" name="transaction_date" value="<?= date('Y-m-d') ?>" required>
+                    <div class="dual-date">
+                        <div class="date-field us">
+                            <span class="date-flag"><i class="fas fa-flag-usa"></i> میلادي (US)</span>
+                            <input type="date"
+                                   name="transaction_date"
+                                   id="paid_date_us"
+                                   value="<?= date('Y-m-d') ?>"
+                                   oninput="onPaidDateUS()" required>
+                        </div>
+                        <div class="date-field af">
+                            <span class="date-flag"><i class="fas fa-moon"></i> هجري شمسي (AF)</span>
+                            <input type="text"
+                                   id="paid_date_af"
+                                   placeholder="1405/08/24"
+                                   value="<?= h(faToday(false)) ?>"
+                                   oninput="onPaidDateAF()">
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -1068,7 +1206,8 @@ function h($value) {
                 <thead>
                     <tr>
                         <th>ID</th>
-                        <th>نېټه</th>
+                        <th>نېټه (میلادي)</th>
+                        <th>نېټه (هجري شمسي)</th>
                         <th>معامله</th>
                         <th>اسعار</th>
                         <th>مقدار</th>
@@ -1083,7 +1222,12 @@ function h($value) {
                         <?php while ($row = $history->fetch_assoc()): ?>
                             <tr>
                                 <td data-label="ID"><?= h($row["id"]) ?></td>
-                                <td data-label="نېټه"><?= h($row["transaction_date"]) ?></td>
+                                <td class="date-us" data-label="نېټه (میلادي)">
+                                    <?= h($row["transaction_date"]) ?>
+                                </td>
+                                <td class="date-af" data-label="نېټه (هجري)">
+                                    <?= h(faDate($row["transaction_date"], true)) ?>
+                                </td>
                                 <td data-label="معامله">
                                     <?php if ($row["transaction_type"] === "received_from_saraf"): ?>
                                         <span class="type-received">
@@ -1118,10 +1262,10 @@ function h($value) {
                         <?php endwhile; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="9">
+                            <td colspan="10">
                                 <div class="mini-empty">
                                     <i class="fas fa-inbox"></i>
-                                    هیڅ معامله ونه موندل شوه.
+                                    هیڅ معامله ونه موندل شوې.
                                 </div>
                             </td>
                         </tr>
@@ -1136,7 +1280,145 @@ function h($value) {
 <script>
 
 // ======================================
-// RECEIVED FROM SARAF
+// JALALI ↔ GREGORIAN CONVERSION (JS)
+// ======================================
+
+function jsGregorianToJalali(gy, gm, gd) {
+    const g_d_m = [0,31,59,90,120,151,181,212,243,273,304,334];
+    let jy, gy2, days, jm, jd;
+
+    if (gy > 1600) { jy = 979; gy -= 1600; }
+    else { jy = 0; gy -= 621; }
+
+    gy2 = (gm > 2) ? (gy + 1) : gy;
+    days = (365 * gy) + Math.floor((gy2 + 3) / 4) - Math.floor((gy2 + 99) / 100)
+         + Math.floor((gy2 + 399) / 400) - 80 + gd + g_d_m[gm - 1];
+
+    jy += 33 * Math.floor(days / 12053);
+    days %= 12053;
+
+    jy += 4 * Math.floor(days / 1461);
+    days %= 1461;
+
+    if (days > 365) {
+        jy += Math.floor((days - 1) / 365);
+        days = (days - 1) % 365;
+    }
+
+    if (days < 186) {
+        jm = 1 + Math.floor(days / 31);
+        jd = 1 + (days % 31);
+    } else {
+        jm = 7 + Math.floor((days - 186) / 30);
+        jd = 1 + ((days - 186) % 30);
+    }
+
+    return [jy, jm, jd];
+}
+
+function jsJalaliToGregorian(jy, jm, jd) {
+    let gy;
+    if (jy > 979) { gy = 1600; jy -= 979; }
+    else { gy = 621; }
+
+    let days = (365 * jy) + (Math.floor(jy / 33) * 8)
+             + Math.floor(((jy % 33) + 3) / 4)
+             + 78 + jd + ((jm < 7) ? (jm - 1) * 31 : ((jm - 7) * 30) + 186);
+
+    gy += 400 * Math.floor(days / 146097);
+    days %= 146097;
+
+    if (days > 36524) {
+        gy += 100 * Math.floor(--days / 36524);
+        days %= 36524;
+        if (days >= 365) days++;
+    }
+
+    gy += 4 * Math.floor(days / 1461);
+    days %= 1461;
+
+    if (days > 365) {
+        gy += Math.floor((days - 1) / 365);
+        days = (days - 1) % 365;
+    }
+
+    let gd = days + 1;
+    const sal_a = [0,31,((gy % 4 === 0 && gy % 100 !== 0) || (gy % 400 === 0)) ? 29 : 28,
+                   31,30,31,30,31,31,30,31,30,31];
+
+    let gm;
+    for (gm = 1; gm <= 12 && gd > sal_a[gm]; gm++) {
+        gd -= sal_a[gm];
+    }
+
+    return [gy, gm, gd];
+}
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function usToAf(usDate) {
+    if (!usDate) return '';
+    const parts = usDate.split('-');
+    if (parts.length !== 3) return '';
+    const gy = parseInt(parts[0], 10);
+    const gm = parseInt(parts[1], 10);
+    const gd = parseInt(parts[2], 10);
+    if (isNaN(gy) || isNaN(gm) || isNaN(gd)) return '';
+    const [jy, jm, jd] = jsGregorianToJalali(gy, gm, gd);
+    return `${jy}/${pad2(jm)}/${pad2(jd)}`;
+}
+
+function afToUs(afDate) {
+    if (!afDate) return '';
+    const parts = afDate.replace(/-/g, '/').split('/');
+    if (parts.length !== 3) return '';
+    const jy = parseInt(parts[0], 10);
+    const jm = parseInt(parts[1], 10);
+    const jd = parseInt(parts[2], 10);
+    if (isNaN(jy) || isNaN(jm) || isNaN(jd)) return '';
+    if (jy < 1200 || jy > 1600) return '';
+    if (jm < 1 || jm > 12) return '';
+    if (jd < 1 || jd > 31) return '';
+    const [gy, gm, gd] = jsJalaliToGregorian(jy, jm, jd);
+    return `${gy}-${pad2(gm)}-${pad2(gd)}`;
+}
+
+// -------- RECEIVED FORM --------
+function onReceiveDateUS() {
+    const us = document.getElementById('receive_date_us').value;
+    document.getElementById('receive_date_af').value = usToAf(us);
+}
+function onReceiveDateAF() {
+    const af = document.getElementById('receive_date_af').value.trim();
+    const us = afToUs(af);
+    if (us) document.getElementById('receive_date_us').value = us;
+}
+
+// -------- PAID FORM --------
+function onPaidDateUS() {
+    const us = document.getElementById('paid_date_us').value;
+    document.getElementById('paid_date_af').value = usToAf(us);
+}
+function onPaidDateAF() {
+    const af = document.getElementById('paid_date_af').value.trim();
+    const us = afToUs(af);
+    if (us) document.getElementById('paid_date_us').value = us;
+}
+
+// -------- EDIT FORM --------
+function onEditDateUS() {
+    const us = document.getElementById('edit_date_us').value;
+    document.getElementById('edit_date_af').value = usToAf(us);
+}
+function onEditDateAF() {
+    const af = document.getElementById('edit_date_af').value.trim();
+    const us = afToUs(af);
+    if (us) document.getElementById('edit_date_us').value = us;
+}
+
+
+// ======================================
+// RECEIVED FROM SARAF — CURRENCY LOGIC
 // ======================================
 
 function changeReceiveCurrency() {
@@ -1172,7 +1454,7 @@ document.getElementById("receive_rate").addEventListener("input", calculateRecei
 
 
 // ======================================
-// PAID TO SARAF
+// PAID TO SARAF — CURRENCY LOGIC
 // ======================================
 
 function changePaidCurrency() {
@@ -1208,7 +1490,7 @@ document.getElementById("paid_rate").addEventListener("input", calculatePaid);
 
 
 // ======================================
-// EDIT FORM
+// EDIT FORM — CURRENCY LOGIC
 // ======================================
 
 function changeEditType() {
