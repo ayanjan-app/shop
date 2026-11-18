@@ -899,60 +899,76 @@ function h($value) {
             margin-bottom: 10px;
         }
 
-        /* ===== MOBILE TABLE → STACKED CARDS ===== */
+        /* ===== RESPONSIVE TABLE (KEPT AS TABLE, HORIZONTAL SCROLL) ===== */
         @media (max-width: 800px) {
-            .table-wrapper { border: none; overflow: visible; border-radius: 0; }
-            .table-wrapper table { display: block; width: 100%; min-width: 0; border-collapse: separate; border-spacing: 0; }
-            .table-wrapper thead { display: none; }
-            .table-wrapper tbody { display: block; width: 100%; }
-            .table-wrapper tbody tr {
-                display: block; width: 100%;
-                background: #ffffff;
+            .table-wrapper {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
                 border: 1px solid #e2e8f0;
-                border-right: 4px solid var(--primary-color);
                 border-radius: 12px;
-                margin-bottom: 14px;
-                padding: 6px 14px;
-                box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
-                box-sizing: border-box;
             }
-            .table-wrapper tbody tr:hover { background: #ffffff; }
-            .table-wrapper tbody td {
-                display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start;
-                gap: 8px 14px; width: 100%; box-sizing: border-box;
-                padding: 10px 0; text-align: right;
-                border-bottom: 1px dashed #e2e8f0;
-                white-space: normal !important;
-                word-break: break-word; overflow-wrap: anywhere;
-                font-size: 0.88rem; line-height: 1.5;
+            table {
+                min-width: 900px;
+                font-size: 0.78rem;
             }
-            .table-wrapper tbody td:last-child { border-bottom: none; }
-            .table-wrapper tbody td::before {
-                content: attr(data-label);
-                display: inline-block;
-                font-weight: 700; color: var(--text-muted);
-                font-size: 0.76rem; flex: 0 0 auto;
-                min-width: 0; text-align: right; white-space: nowrap;
+            th, td {
+                padding: 8px 6px;
+                font-size: 0.75rem;
             }
-            .table-wrapper tbody td > * { max-width: 100%; }
-            .table-wrapper tbody td.note-cell {
-                display: block; min-width: 0; max-width: 100%;
-                white-space: normal; line-height: 1.55; padding: 10px 0;
+            th {
+                font-size: 0.7rem;
+                white-space: nowrap;
             }
-            .table-wrapper tbody td.note-cell::before {
-                display: block; margin-bottom: 4px; white-space: normal;
+            td.note-cell {
+                min-width: 100px;
+                max-width: 160px;
+                font-size: 0.75rem;
             }
-            .table-wrapper tbody td .actions {
-                display: flex; flex-direction: column; gap: 6px; width: 100%;
-                justify-content: flex-start; align-items: stretch;
+            .actions {
+                flex-direction: column;
+                gap: 4px;
             }
-            .table-wrapper tbody td .actions a,
-            .table-wrapper tbody td .actions button {
-                width: 100%; justify-content: center; padding: 9px 12px; font-size: 0.82rem;
+            .actions a,
+            .actions button {
+                width: 100%;
+                justify-content: center;
+                padding: 6px 8px;
+                font-size: 0.7rem;
             }
-            .table-wrapper tbody td .actions form { width: 100%; margin: 0; }
-            .table-wrapper tbody tr td[colspan] { display: block; padding: 0; border: none; }
-            .table-wrapper tbody tr td[colspan]::before { display: none; }
+            .btn-sm {
+                padding: 5px 8px;
+                font-size: 0.7rem;
+            }
+            .amount-usd, .amount-afn, .amount-unpaid,
+            .date-us, .date-af, .type-received, .type-paid {
+                white-space: nowrap;
+            }
+        }
+
+        @media (max-width: 480px) {
+            table {
+                min-width: 800px;
+                font-size: 0.7rem;
+            }
+            th, td {
+                padding: 6px 4px;
+                font-size: 0.68rem;
+            }
+            th {
+                font-size: 0.65rem;
+            }
+            td.note-cell {
+                min-width: 80px;
+                max-width: 120px;
+                font-size: 0.68rem;
+            }
+            .btn-sm {
+                padding: 4px 6px;
+                font-size: 0.65rem;
+            }
+            .actions {
+                gap: 3px;
+            }
         }
 
         @media (max-width: 600px) {
